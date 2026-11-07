@@ -1,0 +1,306 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Phones: keep focused fields/buttons clear of the fixed bottom action bar and sticky header. */
+  @media (max-width: 1023px) {
+    html {
+      scroll-padding-top: 5rem;
+      scroll-padding-bottom: 5.5rem;
+    }
+  }
+
+  body {
+    @apply bg-white font-sans text-[15.5px] leading-[1.7] text-slate-700 antialiased md:text-base;
+    font-feature-settings: 'ss01', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display text-navy-950;
+    text-wrap: balance;
+  }
+
+  h3,
+  h4 {
+    @apply tracking-[-0.01em];
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Premium serif for page & section titles; cards (h3/h4) keep the clean sans display face. */
+  h1,
+  h2 {
+    @apply font-serif font-semibold leading-[1.15] tracking-[-0.015em];
+  }
+
+  ::selection {
+    @apply bg-primary-200 text-primary-950;
+  }
+}
+
+@layer components {
+  .section {
+    @apply py-16 md:py-24;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-700 via-primary-500 to-primary-700 bg-clip-text text-transparent;
+  }
+
+  /* Animated champagne-gold foil text (use on dark backgrounds). */
+  .text-foil {
+    background-image: linear-gradient(110deg, #9a7230 15%, #f1dda8 35%, #cfa557 55%, #f5e6bf 70%, #9a7230 90%);
+    background-size: 220% 100%;
+    @apply bg-clip-text text-transparent;
+    animation: gold-shimmer 3.5s linear infinite;
+  }
+
+  /* Deep antique-gold shimmer that stays readable on light backgrounds. */
+  .text-gold-rich {
+    background-image: linear-gradient(110deg, #7c5b29 10%, #b8913f 30%, #d9b874 45%, #9a7230 60%, #7c5b29 85%);
+    background-size: 220% 100%;
+    @apply bg-clip-text text-transparent;
+    animation: gold-shimmer 3.5s linear infinite;
+  }
+
+  /* ── Editorial Heritage motifs ───────────────────────────────────────── */
+
+  /* Jaali (lattice) pattern inspired by the carved panels on the Panchawati façade. */
+  .bg-jaali {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%23CFA557' stroke-width='1'%3E%3Ccircle cx='0' cy='0' r='28'/%3E%3Ccircle cx='56' cy='0' r='28'/%3E%3Ccircle cx='0' cy='56' r='28'/%3E%3Ccircle cx='56' cy='56' r='28'/%3E%3Ccircle cx='28' cy='28' r='14'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 56px 56px;
+  }
+
+  /* Architect's drawing grid. */
+  .bg-blueprint {
+    background-image:
+      linear-gradient(rgba(184, 139, 62, 0.14) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(184, 139, 62, 0.14) 1px, transparent 1px),
+      linear-gradient(rgba(184, 139, 62, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(184, 139, 62, 0.06) 1px, transparent 1px);
+    background-size: 160px 160px, 160px 160px, 32px 32px, 32px 32px;
+  }
+
+  /* Hollow gold numerals for chapter markers. */
+  .text-outline-gold {
+    color: transparent;
+    -webkit-text-stroke: 1.2px #b88b3e;
+  }
+
+  /* Crop marks at the four corners of a framed photo (architectural print style). */
+  .crop-marks {
+    position: relative;
+  }
+  .crop-marks::before,
+  .crop-marks::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+    pointer-events: none;
+    background:
+      linear-gradient(#b88b3e, #b88b3e) top left / 28px 1px no-repeat,
+      linear-gradient(#b88b3e, #b88b3e) top left / 1px 28px no-repeat,
+      linear-gradient(#b88b3e, #b88b3e) top right / 28px 1px no-repeat,
+      linear-gradient(#b88b3e, #b88b3e) top right / 1px 28px no-repeat,
+      linear-gradient(#b88b3e, #b88b3e) bottom left / 28px 1px no-repeat,
+      linear-gradient(#b88b3e, #b88b3e) bottom left / 1px 28px no-repeat,
+      linear-gradient(#b88b3e, #b88b3e) bottom right / 28px 1px no-repeat,
+      linear-gradient(#b88b3e, #b88b3e) bottom right / 1px 28px no-repeat;
+  }
+  .crop-marks::after {
+    display: none;
+  }
+
+  /* Hide scrollbars on horizontal strips while keeping them scrollable. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Gold range slider (EMI calculator). Large thumb for easy touch use. */
+  .range-gold {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 28px;
+    background: transparent;
+    cursor: pointer;
+    touch-action: pan-y;
+  }
+  .range-gold::-webkit-slider-runnable-track {
+    height: 3px;
+    background: linear-gradient(to right, #b88b3e var(--pct, 50%), rgba(14, 59, 50, 0.15) var(--pct, 50%));
+  }
+  .range-gold::-moz-range-track {
+    height: 3px;
+    background: rgba(14, 59, 50, 0.15);
+  }
+  .range-gold::-moz-range-progress {
+    height: 3px;
+    background: #b88b3e;
+  }
+  .range-gold::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 26px;
+    width: 26px;
+    margin-top: -11.5px;
+    border-radius: 9999px;
+    background: #0e3b32;
+    border: 3px solid #faf7f0;
+    box-shadow: 0 0 0 1px #b88b3e, 0 4px 12px rgba(8, 38, 32, 0.3);
+  }
+  .range-gold::-moz-range-thumb {
+    height: 20px;
+    width: 20px;
+    border-radius: 9999px;
+    background: #0e3b32;
+    border: 3px solid #faf7f0;
+    box-shadow: 0 0 0 1px #b88b3e;
+  }
+  .range-gold:focus-visible {
+    outline: 2px solid #b88b3e;
+    outline-offset: 4px;
+  }
+
+  .glass {
+    @apply border border-white/60 bg-white/70 backdrop-blur-xl;
+  }
+}
+
+/* Defined here (not only in tailwind.config.js) so the gold text never depends on a config reload. */
+@keyframes gold-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NIGHT VIEW: site-wide dark look, toggled by <html class="night">.
+   Light surfaces turn deep emerald-black, ink turns ivory, gold labels brighten.
+   Sections that are already dark (bg-navy-950) keep their own styling.
+   ══════════════════════════════════════════════════════════════════════════ */
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
+  transition:
+    background-color 0.6s ease,
+    border-color 0.6s ease,
+    color 0.6s ease,
+    fill 0.6s ease !important;
+}
+
+html.night {
+  color-scheme: dark;
+}
+html.night body,
+html.night .bg-white,
+html.night .bg-ivory {
+  background-color: #0a1513;
+}
+html.night .bg-ivory\/95 { background-color: rgb(10 21 19 / 0.95); }
+html.night .bg-ivory\/92 { background-color: rgb(16 31 27 / 0.92); border-color: rgb(255 255 255 / 0.08); }
+html.night .bg-ivory\/90,
+html.night .bg-white\/90,
+html.night .bg-white\/95 { background-color: rgb(19 38 32 / 0.92); }
+html.night .bg-white\/60,
+html.night .bg-white\/70 { background-color: rgb(255 255 255 / 0.04); }
+html.night .bg-navy-50,
+html.night .bg-navy-100,
+html.night .bg-primary-50,
+html.night .bg-slate-50,
+html.night .bg-slate-100 { background-color: #12241f; }
+html.night .hover\:bg-navy-50:hover,
+html.night .hover\:bg-ivory\/60:hover,
+html.night .hover\:bg-ivory:hover,
+html.night .focus-within\:bg-ivory:focus-within { background-color: rgb(255 255 255 / 0.06); }
+
+/* Cards that sit on a section get a slightly lifted surface. */
+html.night section .bg-white,
+html.night form.bg-white,
+html.night .shadow-soft.bg-white { background-color: #12241f; }
+html.night .bg-ivory .bg-ivory,
+html.night .bg-white .bg-ivory { background-color: #16302a; }
+
+/* Ink */
+html.night .text-navy-950,
+html.night .text-navy-900,
+html.night .text-navy-800,
+html.night .text-slate-700 { color: #f2ede2; }
+html.night .text-slate-600 { color: rgb(242 237 226 / 0.75); }
+html.night .text-slate-500,
+html.night .text-navy-900\/60 { color: rgb(242 237 226 / 0.6); }
+html.night .text-slate-400,
+html.night .text-navy-900\/50 { color: rgb(242 237 226 / 0.5); }
+html.night .text-navy-900\/30 { color: rgb(242 237 226 / 0.3); }
+html.night .text-primary-600,
+html.night .text-primary-700,
+html.night .text-primary-800 { color: #dec07f; }
+html.night .placeholder\:text-slate-400::placeholder { color: rgb(242 237 226 / 0.4); }
+html.night .text-gold-rich {
+  background-image: linear-gradient(110deg, #c29a52 10%, #f1dda8 30%, #e8d3a0 45%, #cfa557 60%, #c29a52 85%);
+}
+
+/* Lines */
+html.night .border-navy-900\/10,
+html.night .border-slate-100,
+html.night .border-slate-200 { border-color: rgb(255 255 255 / 0.1); }
+html.night .border-navy-900\/15 { border-color: rgb(255 255 255 / 0.14); }
+html.night .border-navy-900\/20,
+html.night .border-navy-200 { border-color: rgb(255 255 255 / 0.2); }
+html.night .border-navy-900\/25 { border-color: rgb(255 255 255 / 0.24); }
+html.night .border-primary-100,
+html.night .border-primary-200,
+html.night .border-primary-200\/50,
+html.night .border-primary-200\/60,
+html.night .border-primary-200\/70 { border-color: rgb(207 165 87 / 0.28); }
+html.night .divide-primary-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(207 165 87 / 0.28); }
+html.night .ring-offset-ivory { --tw-ring-offset-color: #0a1513; }
+
+/* Primary buttons: a lighter emerald so they stand out on the dark page. */
+html.night .bg-navy-900 { background-color: #1c5c4b; }
+html.night .hover\:bg-navy-800:hover,
+html.night .hover\:bg-navy-900:hover { background-color: #23705c; }
+
+/* Fades that blend photos into the page. */
+html.night .from-ivory {
+  --tw-gradient-from: #0a1513 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(10 21 19 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+html.night .range-gold::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #cfa557 var(--pct, 50%), rgb(255 255 255 / 0.15) var(--pct, 50%));
+}
+html.night .range-gold::-moz-range-track { background: rgb(255 255 255 / 0.15); }
+html.night iframe { filter: grayscale(0.5) brightness(0.8) contrast(1.1); }
+html.night .fill-navy-900 { fill: #f2ede2; }
+/* Playfair has no ₹ glyph: draw the rupee sign in the UI font everywhere it appears in serif numbers. */
+.rupee { font-family: 'Manrope', system-ui, sans-serif; font-weight: 600; margin-right: 0.04em; }
