@@ -54,6 +54,12 @@ function CurrentProject({ p, i }) {
             ))}
           </dl>
           <div className="mt-6 flex flex-wrap gap-2">
+            {p.startingFrom && (
+              <span className="bg-primary-400 px-3 py-1.5 text-[12px] font-bold uppercase tracking-[0.12em] text-navy-950">
+                From <span className="rupee">₹</span>
+                {(p.startingFrom / 1e5).toFixed(2)} L*
+              </span>
+            )}
             {p.configs.map((c) => (
               <span key={c} className="border border-primary-300 px-3 py-1.5 text-[12px] font-bold uppercase tracking-[0.12em] text-navy-900">
                 {c}

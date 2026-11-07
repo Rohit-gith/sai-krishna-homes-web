@@ -5,6 +5,7 @@
  */
 import { PHOTOS, VIRTUAL_TOURS } from './projects';
 import { LEADERSHIP } from './companyInfo';
+import { PANCHAWATI_PRICES, SKR_AREA_STATEMENT } from './pricing';
 
 const img = (name, alt) => ({ src: `/images/projects/${name}.webp`, sm: `/images/projects/${name}-sm.webp`, alt });
 const plan = (name, alt) => ({ src: `/images/projects/${name}.webp`, sm: `/images/projects/${name}.webp`, alt });
@@ -137,7 +138,11 @@ export const PROJECT_PAGES = [
     contactTitle: 'Just A Decision Away',
     contactText: 'Step into a lifestyle designed around comfort, modern living and meaningful connections. Discover a home where your aspirations take shape, every convenience is within reach and every day feels a little more extraordinary. Your dream. Your space. Your next chapter.',
     connectText: 'Connect directly with our marketing leadership for transparent pricing, exclusive spot-booking benefits, customized unit selections, and priority site visits at Sai Krishna Residency.',
-    brochure: null, // TODO: add '/brochures/sai-krishna-residency.pdf' when the client sends the PDF
+    brochure: '/brochures/sai-krishna-residency-brochure.pdf',
+    brochureCover: '/images/brochures/sai-krishna-residency-cover.webp',
+    brochureSize: '5.1 MB',
+    areaStatement: SKR_AREA_STATEMENT,
+    extraDownloads: [{ href: '/brochures/sai-krishna-residency-site-plan.pdf', label: 'Sai Krishna Residency site plan', size: '5.5 MB' }],
     faq: [
       ['Where is Sai Krishna Residency located?', "Sai Krishna Residency is located in a prime area of Bhubaneswar, Odisha. It is just 2.5 km from AIIMS, 2 km from Retang Railway Station, and 15 minutes from Biju Patnaik International Airport. The project enjoys excellent connectivity to all major landmarks of the city."],
       ['What types of apartments are available?', 'Sai Krishna Residency offers 1 BHK, 2 BHK, and 3 BHK premium apartments. Each configuration is thoughtfully designed to maximize space utilization, natural light, and cross-ventilation for comfortable living.'],
@@ -272,7 +277,11 @@ export const PROJECT_PAGES = [
     contactTitle: 'Book Your Dream Home',
     contactText: 'Take the first step towards your dream home. Our dedicated sales team is ready to assist you',
     connectText: 'Connect directly with our marketing leadership for transparent pricing, exclusive spot-booking benefits, customized unit selections, and priority site visits at Panchawati Residency.',
-    brochure: null, // TODO: add '/brochures/panchawati-residency.pdf' when the client sends the PDF
+    brochure: '/brochures/panchawati-residency-brochure.pdf',
+    brochureCover: '/images/brochures/panchawati-residency-cover.webp',
+    brochureSize: '18 MB',
+    priceList: PANCHAWATI_PRICES,
+    startingFrom: 4466000,
     tourTitle: 'Experience The Reality',
     tourText: 'Step inside and take an interactive walk through our premium configurations.',
     faq: [

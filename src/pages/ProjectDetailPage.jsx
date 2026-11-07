@@ -12,6 +12,7 @@ import BrochureModal from '@/features/projects/BrochureModal';
 import LeadershipConnect from '@/features/projects/LeadershipConnect';
 import ProjectEnquiryForm from '@/features/projects/ProjectEnquiryForm';
 import ProjectFaq from '@/features/projects/ProjectFaq';
+import PricingSection from '@/features/projects/PricingSection';
 import { PROJECT_PAGES, projectPath } from '@/data/projectPages';
 import { responsive } from '@/data/projects';
 import { COMPANY } from '@/data/companyInfo';
@@ -23,6 +24,7 @@ const sectionsFor = (p) =>
   [
     ['overview', 'Overview'],
     ['floor-plans', 'Floor plans'],
+    ['pricing', p.priceList ? 'Price list' : 'Area statement'],
     p.tours.length ? ['virtual-tour', '360° Tour'] : null,
     ['amenities', 'Amenities'],
     ['specifications', 'Specifications'],
@@ -116,6 +118,12 @@ function Hero({ p, onBrochure }) {
             <span className="flex items-center gap-2 border border-white/25 bg-white/10 px-3.5 py-2 backdrop-blur"><MapPin className="h-4 w-4 text-primary-300" /> {p.location}</span>
             <span className="flex items-center gap-2 border border-white/25 bg-white/10 px-3.5 py-2 backdrop-blur"><BadgeCheck className="h-4 w-4 text-primary-300" /> RERA {p.rera}</span>
             <span className="border border-white/25 bg-white/10 px-3.5 py-2 backdrop-blur">{p.configs.join(' · ')}</span>
+            {p.startingFrom && (
+              <span className="bg-primary-400 px-3.5 py-2 text-navy-950">
+                Starting <span className="rupee">₹</span>
+                {(p.startingFrom / 1e5).toFixed(2)} L*
+              </span>
+            )}
           </div>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <a
@@ -509,6 +517,17 @@ export default function ProjectDetailPage() {
   const openBrochure = useCallback(() => setBrochure(true), []);
   const closeBrochure = useCallback(() => setBrochure(false), []);
   const sections = useMemo(() => (p ? sectionsFor(p) : []), [p]);
+  const enquireFlat = useCallback(
+    (r) => {
+      const c = p.contact;
+      const msg = r
+        ? `Hi ${c.name.split(' ')[0]} Ji, I am interested in ${p.name}: ${r.type}, flat ${r.flats} (carpet ${r.carpet} sq ft). Please share availability and booking details.`
+        : `Hi ${c.name.split(' ')[0]} Ji, please share the latest price list for ${p.name}.`;
+      const url = `https://wa.me/${c.phone}?text=${encodeURIComponent(msg)}`;
+      if (!window.open(url, '_blank')) window.location.href = url;
+    },
+    [p],
+  );
   if (!p) return <Navigate to="/projects" replace />;
   const ROMANS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
   const roman = (id) => ROMANS[sections.findIndex(([x]) => x === id)];
@@ -519,6 +538,7 @@ export default function ProjectDetailPage() {
       <SubNav sections={sections} />
       <Overview p={p} view={view} />
       <FloorPlans p={p} view={view} onBrochure={openBrochure} />
+      <PricingSection project={p} numeral={roman('pricing')} onBrochure={openBrochure} onEnquire={enquireFlat} />
       {p.tours.length > 0 && (
         <VirtualTourSection numeral={roman('virtual-tour')} label={p.tourTitle} title={`Experience ${p.name} in 360°`} intro={p.tourText} />
       )}
