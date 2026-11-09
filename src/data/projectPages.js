@@ -7,6 +7,20 @@ import { PHOTOS, VIRTUAL_TOURS } from './projects';
 import { LEADERSHIP } from './companyInfo';
 import { PANCHAWATI_PRICES, SKR_AREA_STATEMENT } from './pricing';
 
+const price = (n) => (n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : `₹${(n / 1e5).toFixed(2).replace(/\.00$/, '')} L`);
+/** Facts for one Panchawati block, computed from the official price list. */
+function blockFacts(id) {
+  const rows = PANCHAWATI_PRICES.blocks.find((b) => b.id === id).rows;
+  const byType = {};
+  for (const r of rows) byType[r.type] = Math.min(byType[r.type] ?? Infinity, r.price);
+  const carpets = rows.map((r) => r.carpet);
+  return [
+    ...Object.entries(byType).sort().map(([t, v]) => [`${t} from`, price(v)]),
+    ['Carpet area', `${Math.min(...carpets)}–${Math.max(...carpets)} sq ft`],
+    ['Flat types / floor', String(rows.length)],
+  ];
+}
+
 const img = (name, alt) => ({ src: `/images/projects/${name}.webp`, sm: `/images/projects/${name}-sm.webp`, alt });
 const plan = (name, alt) => ({ src: `/images/projects/${name}.webp`, sm: `/images/projects/${name}.webp`, alt });
 const [CMO, GM] = LEADERSHIP.contacts;
@@ -142,6 +156,18 @@ export const PROJECT_PAGES = [
     brochureCover: '/images/brochures/sai-krishna-residency-cover.webp',
     brochureSize: '5.1 MB',
     areaStatement: SKR_AREA_STATEMENT,
+    // Positions are % of the aerial render (placed by eye on clearly visible features).
+    masterPlanSpots: [
+      { id: 'towers', short: '1', x: 50, y: 55, tag: 'Residences', title: 'Residential towers', text: 'Mid-rise residential complexes of 6 floors each, set along landscaped internal roads.', link: { label: 'See the area statement', href: '#pricing' } },
+      { id: 'pool', short: '2', x: 37, y: 82, tag: 'Amenity', title: 'Swimming pool', text: 'The township pool beside the towers, part of the resort-style amenities.', link: { label: 'View amenities', href: '#amenities' } },
+      { id: 'rear', short: '3', x: 70, y: 17, tag: 'Residences', title: 'Towers along the rear avenue', text: 'More residential complexes line the internal avenue at the back of the township.' },
+      { id: 'road', short: '4', x: 91, y: 62, tag: 'Access', title: 'Approach road', text: 'Wide approach roads on two sides for easy access to the gates.', link: { label: 'Location & connectivity', href: '#location' } },
+      { id: 'greens', short: '5', x: 13, y: 22, tag: 'Surroundings', title: 'Open green surroundings', text: 'The township is set amid open land with room to grow further.' },
+    ],
+    walkthroughs: [
+      { src: '/videos/sai-krishna-walkthrough-1.mp4', title: 'Walkthrough 1', caption: 'Sai Krishna Residency · video walkthrough', duration: '0:52', poster: img('skr/walkthrough-1', 'Walkthrough 1') },
+      { src: '/videos/sai-krishna-walkthrough-2.mp4', title: 'Walkthrough 2', caption: 'Sai Krishna Residency · video walkthrough', duration: '1:32', poster: img('skr/walkthrough-2', 'Walkthrough 2') },
+    ],
     extraDownloads: [{ href: '/brochures/sai-krishna-residency-site-plan.pdf', label: 'Sai Krishna Residency site plan', size: '5.5 MB' }],
     faq: [
       ['Where is Sai Krishna Residency located?', "Sai Krishna Residency is located in a prime area of Bhubaneswar, Odisha. It is just 2.5 km from AIIMS, 2 km from Retang Railway Station, and 15 minutes from Biju Patnaik International Airport. The project enjoys excellent connectivity to all major landmarks of the city."],
@@ -281,6 +307,15 @@ export const PROJECT_PAGES = [
     brochureCover: '/images/brochures/panchawati-residency-cover.webp',
     brochureSize: '18 MB',
     priceList: PANCHAWATI_PRICES,
+    // Block C = the narrow middle building (6 flats/floor). TODO: client to confirm Block A (left) vs Block B (right).
+    masterPlanSpots: [
+      { id: 'a', short: 'A', x: 30, y: 47, tag: 'Block A', title: 'Block A', text: 'Modern 2 BHK and 3 BHK apartments tailored for family comfort.', facts: blockFacts('A'), link: { label: 'Block A price list', href: '#pricing' } },
+      { id: 'c', short: 'C', x: 51, y: 40, tag: 'Block C', title: 'Block C', text: 'A premium tower featuring exclusive 1 BHK and 2 BHK units crafted for intimate and cozy living.', facts: blockFacts('C'), link: { label: 'Block C price list', href: '#pricing' } },
+      { id: 'b', short: 'B', x: 73, y: 47, tag: 'Block B', title: 'Block B', text: 'Luxurious 2 BHK and 3 BHK homes thoughtfully optimized for ventilation and natural light.', facts: blockFacts('B'), link: { label: 'Block B price list', href: '#pricing' } },
+      { id: 'entry', short: '1', x: 51, y: 72, tag: 'Arrival', title: 'Grand entrance & lobby', text: 'The lantern-lit classical entrance with a landscaped forecourt leading into the community.' },
+      { id: 'drive', short: '2', x: 25, y: 87, tag: 'Access', title: 'Driveway & road frontage', text: 'Wide driveway along the front of the property with planted edges.' },
+      { id: 'green', short: '3', x: 8, y: 40, tag: 'Landscape', title: 'Green belt', text: 'A continuous belt of trees and planting around the boundary of the site.' },
+    ],
     startingFrom: 4466000,
     tourTitle: 'Experience The Reality',
     tourText: 'Step inside and take an interactive walk through our premium configurations.',

@@ -13,6 +13,8 @@ import LeadershipConnect from '@/features/projects/LeadershipConnect';
 import ProjectEnquiryForm from '@/features/projects/ProjectEnquiryForm';
 import ProjectFaq from '@/features/projects/ProjectFaq';
 import PricingSection from '@/features/projects/PricingSection';
+import InteractivePlan from '@/features/projects/InteractivePlan';
+import WalkthroughSection from '@/features/projects/WalkthroughSection';
 import { PROJECT_PAGES, projectPath } from '@/data/projectPages';
 import { responsive } from '@/data/projects';
 import { COMPANY } from '@/data/companyInfo';
@@ -25,6 +27,7 @@ const sectionsFor = (p) =>
     ['overview', 'Overview'],
     ['floor-plans', 'Floor plans'],
     ['pricing', p.priceList ? 'Price list' : 'Area statement'],
+    p.walkthroughs?.length ? ['walkthrough', 'Walkthrough'] : null,
     p.tours.length ? ['virtual-tour', '360° Tour'] : null,
     ['amenities', 'Amenities'],
     ['specifications', 'Specifications'],
@@ -284,10 +287,11 @@ function FloorPlans({ p, view, onBrochure }) {
           </div>
         </div>
 
-        <Reveal className="mt-20 grid gap-8 lg:grid-cols-[1fr_1.4fr] lg:items-center">
+        <Reveal className="mt-20 grid gap-8 lg:grid-cols-[0.8fr_1.6fr] lg:items-start">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-primary-700">Master plan</p>
             <h3 className="mt-3 font-serif text-3xl text-navy-950 md:text-4xl">The whole community, at a glance</h3>
+            {p.masterPlanSpots && <p className="mt-3 text-[15px] leading-relaxed text-slate-600">Tap a marker on the plan to explore each block and space.</p>}
             <button type="button" onClick={onBrochure} className="mt-6 inline-flex items-center gap-2 bg-navy-900 px-6 py-3.5 text-[12px] font-bold uppercase tracking-[0.18em] text-white hover:bg-navy-800">
               <Download className="h-4 w-4 text-primary-300" /> Download brochure
             </button>
@@ -301,10 +305,13 @@ function FloorPlans({ p, view, onBrochure }) {
               </Link>
             )}
           </div>
-          <button type="button" data-cursor="view" onClick={() => view([p.masterPlan])} className="group relative block overflow-hidden bg-white p-3" aria-label="Open master plan full screen">
-            <img src={p.masterPlan.src} alt={p.masterPlan.alt} loading="lazy" className="w-full object-contain transition-transform duration-700 group-hover:scale-[1.02]" />
-            <span className="absolute right-4 top-4 flex items-center gap-1.5 bg-navy-900 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white"><Expand className="h-3.5 w-3.5" /> Zoom</span>
-          </button>
+          {p.masterPlanSpots ? (
+            <InteractivePlan image={p.masterPlan} spots={p.masterPlanSpots} onZoom={() => view([p.masterPlan])} />
+          ) : (
+            <button type="button" data-cursor="view" onClick={() => view([p.masterPlan])} className="group relative block overflow-hidden bg-white p-3" aria-label="Open master plan full screen">
+              <img src={p.masterPlan.src} alt={p.masterPlan.alt} loading="lazy" className="w-full object-contain" />
+            </button>
+          )}
         </Reveal>
       </div>
     </section>
@@ -539,6 +546,7 @@ export default function ProjectDetailPage() {
       <Overview p={p} view={view} />
       <FloorPlans p={p} view={view} onBrochure={openBrochure} />
       <PricingSection project={p} numeral={roman('pricing')} onBrochure={openBrochure} onEnquire={enquireFlat} />
+      {p.walkthroughs?.length > 0 && <WalkthroughSection project={p} numeral={roman('walkthrough')} />}
       {p.tours.length > 0 && (
         <VirtualTourSection numeral={roman('virtual-tour')} label={p.tourTitle} title={`Experience ${p.name} in 360°`} intro={p.tourText} />
       )}

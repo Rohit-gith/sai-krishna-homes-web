@@ -33,12 +33,15 @@ export const LEADERSHIP = {
   md: {
     name: 'Shashi Sekhar Garabadu',
     role: 'Managing Director',
+    badge: 'Official MD',
     photo: '/images/team/managing-director.webp',
+    photoBg: '#cfceb9',
+    photoPos: '41% 30%',
   },
   contacts: [
-    { name: 'Shyam Prashad Misra', role: 'Chief Marketing Officer (CMO)', badge: 'Official CMO', phone: '918342948803', phoneDisplay: '+91 83429 48803', photo: '/images/team/shyam-prashad-misra.webp' },
+    { name: 'Shyam Prashad Misra', role: 'Chief Marketing Officer (CMO)', badge: 'Official CMO', phone: '918342948803', phoneDisplay: '+91 83429 48803', photo: '/images/team/shyam-prashad-misra.webp', photoBg: '#eeecf4', photoAspect: 768 / 1364, photoPos: '50% 22%' },
     // Photo labelled "Devarshi Negi, Sales & Marketing (GM)" on the old Sai Krishna Residency page. TODO: confirm with client.
-    { name: 'Devarshi Negi', role: 'General Manager (GM) – Sales & Marketing', badge: 'Official GM', phone: '919178255757', phoneDisplay: '+91 91782 55757', photo: '/images/team/devarshi-negi.webp' },
+    { name: 'Devarshi Negi', role: 'General Manager (GM) – Sales & Marketing', badge: 'Official GM', phone: '919178255757', phoneDisplay: '+91 91782 55757', photo: '/images/team/devarshi-negi.webp', photoBg: '#f4f6fa', photoAspect: 900 / 752, photoPos: '50% 30%' },
   ],
 };
 

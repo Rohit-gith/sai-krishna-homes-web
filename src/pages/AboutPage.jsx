@@ -9,6 +9,7 @@ import CtaSection from '@/components/common/CtaSection';
 import { COMPANY, LEADERSHIP } from '@/data/companyInfo';
 import { PHOTOS, responsive } from '@/data/projects';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import LeaderCard from '@/components/common/LeaderCard';
 import logoImg from '@/assets/logo/logo.png';
 import { cn } from '@/utils/cn';
 
@@ -165,7 +166,7 @@ export default function AboutPage() {
       </section>
 
       {/* II. A letter from the Managing Director */}
-      <section className="section relative overflow-hidden bg-ivory">
+      <section id="md-letter" className="section relative scroll-mt-28 overflow-hidden bg-ivory">
         <div aria-hidden className="bg-jaali pointer-events-none absolute -left-24 top-0 h-full w-[26rem] opacity-[0.07]" />
         <div className="container relative">
           <div className="grid gap-14 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20">
@@ -240,41 +241,36 @@ export default function AboutPage() {
 
       <Pillars />
 
-      {/* IV. Talk to our team */}
+      {/* IV. Leadership: one standard card size for every leader */}
       <section className="section bg-white">
         <div className="container">
           <ChapterHeading
             numeral="IV"
-            label="Our team"
-            title="Talk to the people behind your home"
-            intro="Questions about a project, a site visit or pricing? Call or WhatsApp our team directly."
+            label="Our leadership"
+            title="The people behind your home"
+            intro="Questions about a project, a site visit or pricing? Call or WhatsApp our leadership directly."
           />
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <Reveal>
+              <LeaderCard
+                person={md}
+                footer={
+                  <a
+                    href="#md-letter"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById('md-letter')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex w-full items-center justify-center gap-2 bg-ivory px-3 py-3 text-[12px] font-bold uppercase tracking-[0.15em] text-navy-950 hover:bg-primary-100"
+                  >
+                    Read the MD&apos;s message
+                  </a>
+                }
+              />
+            </Reveal>
             {contacts.map((c, i) => (
-              <Reveal key={c.name} delay={i * 0.08} className="border border-navy-900/10 bg-ivory p-6 sm:p-8">
-                <div className="flex items-center gap-5">
-                  <img src={c.photo} alt={`${c.name}, ${c.role}`} loading="lazy" className="h-20 w-20 shrink-0 rounded-full border-2 border-primary-400 object-cover object-top" />
-                  <span>
-                    <span className="block font-serif text-2xl text-navy-950">{c.name}</span>
-                    <span className="mt-1 block text-[12px] font-bold uppercase tracking-[0.18em] text-primary-700">{c.role}</span>
-                  </span>
-                </div>
-                <div className="mt-6 flex flex-col gap-3 border-t border-navy-900/10 pt-6 sm:flex-row">
-                  <a
-                    href={`tel:+${c.phone}`}
-                    className="inline-flex flex-1 items-center justify-center gap-2 bg-navy-900 px-5 py-3.5 text-[12px] font-bold uppercase tracking-[0.15em] text-white hover:bg-navy-800"
-                  >
-                    <Phone className="h-4 w-4 text-primary-300" /> {c.phoneDisplay}
-                  </a>
-                  <a
-                    href={`https://wa.me/${c.phone}?text=${encodeURIComponent(`Hello ${c.name.split(' ')[0]}, I'd like to know more about Sai Krishna Homes.`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center justify-center gap-2 border border-navy-900/20 px-5 py-3.5 text-[12px] font-bold uppercase tracking-[0.15em] text-navy-900 hover:border-primary-400"
-                  >
-                    <MessageCircle className="h-4 w-4 text-[#1fa855]" /> WhatsApp
-                  </a>
-                </div>
+              <Reveal key={c.name} delay={(i + 1) * 0.08}>
+                <LeaderCard person={c} actions />
               </Reveal>
             ))}
           </div>
