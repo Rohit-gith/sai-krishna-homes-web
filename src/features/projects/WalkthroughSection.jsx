@@ -61,6 +61,9 @@ export default function WalkthroughSection({ project, numeral }) {
                     src={w.src}
                     controls
                     playsInline
+                    controlsList="nodownload noremoteplayback noplaybackrate"
+                    disablePictureInPicture
+                    onContextMenu={(e) => e.preventDefault()}
                     preload="none"
                     poster={w.poster.src}
                     onError={() => setFailed(true)}

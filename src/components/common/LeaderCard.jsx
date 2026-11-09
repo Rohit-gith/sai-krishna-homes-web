@@ -1,16 +1,23 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Expand, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
 import { Lightbox } from '@/features/home/components/GallerySection';
 import { cn } from '@/utils/cn';
 
+const toSlide = (p) => ({ src: p.photo, alt: `${p.name}, ${p.role}`, title: `${p.name} · ${p.role}` });
+
 /**
  * The one standard portrait card for every leader on the site: 4:5 photo, gold rule, name band,
  * role. Same size wherever it is used (About, project pages). Tap the photo to view it full size.
  * person: { name, role, photo, photoPos?, photoBg?, badge?, phone?, phoneDisplay? }
+ * group: optional list of all leaders shown together, so the full-size viewer can step between them.
  */
-export default function LeaderCard({ person, actions = false, waText, footer, fill = false, className }) {
-  const [open, setOpen] = useState(false);
+export default function LeaderCard({ person, group, actions = false, waText, footer, fill = false, className }) {
+  const people = useMemo(() => (group?.length ? group : [person]), [group, person]);
+  const slides = useMemo(() => people.map(toSlide), [people]);
+  const [open, setOpen] = useState(null);
+  const nav = useCallback((d) => setOpen((i) => (i + d + slides.length) % slides.length), [slides.length]);
+  const close = useCallback(() => setOpen(null), []);
   const first = person.name.split(' ')[0];
 
   return (
@@ -18,7 +25,7 @@ export default function LeaderCard({ person, actions = false, waText, footer, fi
       <button
         type="button"
         data-cursor="view"
-        onClick={() => setOpen(true)}
+        onClick={() => setOpen(Math.max(0, people.findIndex((p) => p.name === person.name)))}
         className="group relative block aspect-[4/5] w-full overflow-hidden"
         style={{ backgroundColor: person.photoBg || '#f1f2f5' }}
         aria-label={`View full photo of ${person.name}`}
@@ -66,14 +73,7 @@ export default function LeaderCard({ person, actions = false, waText, footer, fi
       )}
 
       <AnimatePresence>
-        {open && (
-          <Lightbox
-            items={[{ src: person.photo, alt: `${person.name}, ${person.role}`, title: `${person.name} · ${person.role}` }]}
-            index={0}
-            onClose={() => setOpen(false)}
-            onNav={() => {}}
-          />
-        )}
+        {open !== null && <Lightbox items={slides} index={open} onClose={close} onNav={nav} />}
       </AnimatePresence>
     </article>
   );

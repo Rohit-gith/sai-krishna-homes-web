@@ -1,8 +1,32 @@
-import { lazy, Suspense } from 'react';
+import { lazy as reactLazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { ROUTES } from '@/constants/routes';
 import PageLoader from '@/components/common/PageLoader';
+
+/**
+ * lazy() that survives a new deploy (or a dev-server restart): if a page's file can no longer be
+ * fetched because the open tab still points at the old build, reload once to pick up the new one
+ * instead of showing an error. The flag stops a reload loop if the file is truly missing.
+ */
+const RELOAD_FLAG = 'skh_chunk_reload';
+const lazy = (load) =>
+  reactLazy(() =>
+    load()
+      .then((m) => {
+        try { sessionStorage.removeItem(RELOAD_FLAG); } catch { /* storage blocked */ }
+        return m;
+      })
+      .catch((err) => {
+        let reloaded = false;
+        try { reloaded = sessionStorage.getItem(RELOAD_FLAG) === '1'; sessionStorage.setItem(RELOAD_FLAG, '1'); } catch { /* storage blocked */ }
+        if (!reloaded) {
+          window.location.reload();
+          return new Promise(() => {}); // keep showing the loader until the reload happens
+        }
+        throw err;
+      }),
+  );
 
 // Pages are lazy-loaded so each page downloads only when visited.
 const HomePage = lazy(() => import('@/pages/HomePage'));

@@ -16,6 +16,14 @@
     }
   }
 
+  /* Photos and videos: no drag-to-desktop, no iOS long-press "Save image" menu. */
+  img,
+  video {
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+
   body {
     @apply bg-white font-sans text-[15.5px] leading-[1.7] text-slate-700 antialiased md:text-base;
     font-feature-settings: 'ss01', 'cv11';

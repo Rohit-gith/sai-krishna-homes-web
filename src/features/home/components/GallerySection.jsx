@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Expand, X } from 'lucide-react';
 import ChapterHeading from './ChapterHeading';
@@ -7,12 +8,13 @@ import { cn } from '@/utils/cn';
 
 export function Lightbox({ items, index, onClose, onNav }) {
   const item = items[index];
+  const multi = items.length > 1;
 
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') onNav(1);
-      if (e.key === 'ArrowLeft') onNav(-1);
+      if (multi && e.key === 'ArrowRight') onNav(1);
+      if (multi && e.key === 'ArrowLeft') onNav(-1);
     };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -21,9 +23,10 @@ export function Lightbox({ items, index, onClose, onNav }) {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose, onNav]);
+  }, [onClose, onNav, multi]);
 
-  return (
+  // Portal to <body>: a transformed ancestor (scroll-reveal animation) would otherwise trap this fixed overlay.
+  return createPortal(
     <motion.div
       role="dialog"
       aria-modal="true"
@@ -37,9 +40,11 @@ export function Lightbox({ items, index, onClose, onNav }) {
       <div className="flex items-center justify-between px-4 py-4 text-white sm:px-8">
         <p className="text-sm">
           <span className="font-serif text-lg">{item.title}</span>
-          <span className="ml-3 text-white/50">
-            {index + 1} / {items.length}
-          </span>
+          {multi && (
+            <span className="ml-3 text-white/50">
+              {index + 1} / {items.length}
+            </span>
+          )}
         </p>
         <button
           type="button"
@@ -53,25 +58,40 @@ export function Lightbox({ items, index, onClose, onNav }) {
 
       <div className="relative flex flex-1 items-center justify-center px-4 pb-8 sm:px-20">
         <AnimatePresence mode="wait" initial={false}>
-          <motion.img
+          <motion.div
             key={item.src}
-            src={item.src}
-            alt={item.alt}
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            drag="x"
+            drag={multi ? 'x' : false}
             dragConstraints={{ left: 0, right: 0 }}
             onDragEnd={(_, info) => {
               if (info.offset.x < -60) onNav(1);
               if (info.offset.x > 60) onNav(-1);
             }}
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[80vh] max-w-full cursor-grab rounded-2xl object-contain shadow-2xl active:cursor-grabbing"
-          />
+            className={cn('relative max-w-full overflow-hidden rounded-2xl shadow-2xl', multi && 'cursor-grab active:cursor-grabbing')}
+          >
+            <img src={item.src} alt={item.alt} className="block max-h-[80vh] max-w-full object-contain" />
+            {/* watermark: full-size views carry the brand if someone screenshots them */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 flex select-none items-center justify-center"
+            >
+              <span className="-rotate-12 whitespace-nowrap font-serif text-[clamp(0.85rem,2.6vw,2rem)] uppercase tracking-[0.3em] text-white/25 [text-shadow:0_1px_3px_rgba(0,0,0,0.35)]">
+                Sai Krishna Homes
+              </span>
+            </span>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-3 right-4 select-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/60 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]"
+            >
+              © Sai Krishna Homes
+            </span>
+          </motion.div>
         </AnimatePresence>
-        {[-1, 1].map((dir) => (
+        {multi && [-1, 1].map((dir) => (
           <button
             key={dir}
             type="button"
@@ -89,7 +109,8 @@ export function Lightbox({ items, index, onClose, onNav }) {
           </button>
         ))}
       </div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   );
 }
 

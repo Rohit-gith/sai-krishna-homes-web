@@ -110,6 +110,9 @@ function Pillars() {
   );
 }
 
+// Every leader in one list, so the full-size photo viewer can step MD → CMO → GM with the arrows.
+const LEADERS = [LEADERSHIP.md, ...LEADERSHIP.contacts];
+
 export default function AboutPage() {
   useDocumentTitle('About Us');
   const { md, contacts } = LEADERSHIP;
@@ -254,6 +257,7 @@ export default function AboutPage() {
             <Reveal>
               <LeaderCard
                 person={md}
+                group={LEADERS}
                 footer={
                   <a
                     href="#md-letter"
@@ -270,7 +274,7 @@ export default function AboutPage() {
             </Reveal>
             {contacts.map((c, i) => (
               <Reveal key={c.name} delay={(i + 1) * 0.08}>
-                <LeaderCard person={c} actions />
+                <LeaderCard person={c} group={LEADERS} actions />
               </Reveal>
             ))}
           </div>
