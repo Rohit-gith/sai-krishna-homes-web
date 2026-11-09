@@ -170,29 +170,26 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-5 border-t border-white/10 py-7 text-xs text-white/45 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-1 border-t border-white/10 py-4 text-[11px] leading-5 text-white/40 md:flex-row md:items-center md:justify-between">
           <p>
             © {year} {COMPANY.name} All rights reserved.
             {COMPANY.cin && <span className="ml-3">CIN: {COMPANY.cin}</span>}
           </p>
-          <a
-            href="https://www.fidelsya.com/"
-            target="_blank"
-            rel="noopener"
-            className="group inline-flex items-center gap-3 self-start border border-white/10 py-2 pl-2 pr-4 transition-colors hover:border-primary-300/60 hover:bg-white/[0.03] md:self-auto"
-            aria-label="Designed and developed by Fidelsya (opens in a new tab)"
-          >
-            <span className="flex h-9 w-9 items-center justify-center bg-white/[0.06]">
-              <img src="/images/credits/fidelsya-mark.webp" alt="" className="h-5 w-auto" />
-            </span>
-            <span className="leading-tight">
-              <span className="block text-[10px] font-bold uppercase tracking-[0.26em] text-white/50">Designed &amp; developed by</span>
-              <span className="mt-0.5 flex items-center gap-1.5 font-sans text-[13px] font-bold tracking-[0.32em] text-white transition-colors group-hover:text-primary-200">
-                FIDELSYA
-                <ArrowUpRight className="h-3.5 w-3.5 text-primary-300 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-              </span>
-            </span>
-          </a>
+          {/* developer credit: one quiet line, same size as the copyright */}
+          <p>
+            Designed &amp; developed by{' '}
+            <a
+              href="https://www.fidelsya.com/"
+              target="_blank"
+              rel="noopener"
+              className="group inline-flex items-center gap-1 align-middle font-semibold tracking-[0.1em] text-white/65 transition-colors hover:text-primary-200"
+              aria-label="Fidelsya (opens in a new tab)"
+            >
+              <img src="/images/credits/fidelsya-mark.webp" alt="" className="h-3 w-auto opacity-70 group-hover:opacity-100" />
+              FIDELSYA TECHNOLOGY PVT. LTD.
+              <ArrowUpRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+            </a>
+          </p>
         </div>
       </div>
     </footer>
