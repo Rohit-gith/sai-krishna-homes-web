@@ -122,7 +122,7 @@ function PastWork() {
 }
 
 export default function ProjectsPage() {
-  useDocumentTitle('Our Projects');
+  useDocumentTitle('Our Projects', 'Current and completed projects by Sai Krishna Homes in Bhubaneswar: Panchawati Residency (Patia) and Sai Krishna Residency (South Bhubaneswar).');
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') === 'past' ? 'past' : 'current';
 

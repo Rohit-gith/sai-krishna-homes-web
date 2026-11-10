@@ -6,7 +6,7 @@ import FaqSection from '@/features/home/components/FaqSection';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export default function ContactPage() {
-  useDocumentTitle('Contact Us');
+  useDocumentTitle('Contact Us', 'Call, WhatsApp or visit Sai Krishna Homes, Old Town, Bhubaneswar. Book a site visit for Panchawati Residency or Sai Krishna Residency.');
   return (
     <>
       <PageHero title="Contact Us" subtitle="Have a question or need a service? We'd love to hear from you." />

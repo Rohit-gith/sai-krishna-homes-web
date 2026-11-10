@@ -49,7 +49,7 @@ export default function ExplorePage() {
   const { slug } = useParams();
   const index = CHAPTERS.findIndex((c) => c.slug === slug);
   const chapter = CHAPTERS[index];
-  useDocumentTitle(chapter?.title || 'Explore');
+  useDocumentTitle(chapter?.title || 'Explore', chapter && `${chapter.blurb}. Explore Sai Krishna Homes, Bhubaneswar.`);
   // The masterplan moved back to the home page.
   if (slug === 'masterplan') return <Navigate to="/#masterplan" replace />;
   if (!chapter) return <Navigate to="/" replace />;

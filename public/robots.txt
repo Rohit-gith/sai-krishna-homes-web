@@ -2,3 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /login
+
+Sitemap: https://sai-krishna-homes-web.vercel.app/sitemap.xml

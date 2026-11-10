@@ -177,7 +177,7 @@ export default function Footer() {
           </p>
           {/* developer credit: one quiet line, same size as the copyright */}
           <p>
-            Designed &amp; developed by{' '}
+            Designed &amp; developed by:{' '}
             <a
               href="https://www.fidelsya.com/"
               target="_blank"

@@ -114,7 +114,7 @@ function Pillars() {
 const LEADERS = [LEADERSHIP.md, ...LEADERSHIP.contacts];
 
 export default function AboutPage() {
-  useDocumentTitle('About Us');
+  useDocumentTitle('About Us', 'Sai Krishna Homes Pvt. Ltd., building homes in Bhubaneswar since 2010. Our story, mission and values, and a message from our Managing Director.');
   const { md, contacts } = LEADERSHIP;
 
   return (

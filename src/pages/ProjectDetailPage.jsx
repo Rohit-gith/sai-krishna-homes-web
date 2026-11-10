@@ -518,7 +518,10 @@ function BrochureTab({ onClick }) {
 export default function ProjectDetailPage() {
   const { slug } = useParams();
   const p = PROJECT_PAGES.find((x) => x.slug === slug);
-  useDocumentTitle(p ? `${p.name} · ${p.location}` : 'Projects');
+  useDocumentTitle(
+    p ? `${p.name} · ${p.location}` : 'Projects',
+    p && `${p.name}, ${p.location} by Sai Krishna Homes: ${p.configs.join(', ')} homes. RERA ${p.rera}. Floor plans, price list, brochure, amenities and site visits.`,
+  );
   const [view, viewer] = useViewer();
   const [brochure, setBrochure] = useState(false);
   const openBrochure = useCallback(() => setBrochure(true), []);
