@@ -34,6 +34,9 @@ export const PROJECT_PAGES = [
     headline: 'Largest Township Project Of South Bhubaneswar Near Infosys 2',
     location: 'South Bhubaneswar · Near Cuttack–Bhubaneswar Bypass',
     rera: 'MP/19/2024/01126',
+    // Official Odisha RERA page. Checked 13 Nov 2026: 497 units, S+6 + market complex, possession 1 May 2028.
+    reraUrl:
+      'https://rera.odisha.gov.in/projects/project-details/VTJGc2RHVmtYMSsrL1A4UmowQlNmQ0kxYnpqR0FxNWpxcFZoWnEwdXhBbUNsZmRHUjgxbTRjYzZYRzZjaS9XZm9yT0lHZGNhWENPN290QVVJNlFNd1o0bEhLNUluUkZkVnQxMkJveG04NFk9?name=SAI%20KRISHNA%20RESIDENCY',
     configs: ['1 BHK', '2 BHK', '3 BHK'],
     hero: img('skr/banner-night', 'Sai Krishna Residency township at night'),
     card: img('skr/banner-night', 'Sai Krishna Residency township at night'),
@@ -190,6 +193,9 @@ export const PROJECT_PAGES = [
     headline: "Patia's Most Talked-About Address",
     location: 'Patia, Bhubaneswar',
     rera: 'RP/19/2023/00993',
+    // Official Odisha RERA page. Checked 13 Nov 2026: 120 units, S+4, possession 20 Nov 2027.
+    reraUrl:
+      'https://rera.odisha.gov.in/projects/project-details/VTJGc2RHVmtYMSsrNUJOalNZNUpmRWQ1N1lDTkcrRmRCZUprUm5jUUVjZkVOWURNMThwdmRwQ2NWUEdDdjNsT2Z4ZmFlbXJSQzk5TGF5K3gySEdBME5GQkgreHNQNFdLN0JkODg4NzYxb009?name=Panchawati%20Residency',
     configs: ['1 BHK', '2 BHK', '3 BHK'],
     hero: PHOTOS.pwGate,
     card: PHOTOS.pwDay,

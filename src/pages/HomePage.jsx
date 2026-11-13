@@ -7,7 +7,7 @@ import AmenitiesSection from '@/features/home/components/AmenitiesSection';
 import MasterplanSection from '@/features/home/components/MasterplanSection';
 import WhyChooseUs from '@/features/home/components/WhyChooseUs';
 import TestimonialsSection from '@/features/home/components/TestimonialsSection';
-import EmiCalculator from '@/features/home/components/EmiCalculator';
+import ComparisonSection from '@/features/home/components/ComparisonSection';
 import ExploreStrip from '@/features/explore/ExploreStrip';
 import CtaSection from '@/components/common/CtaSection';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -26,7 +26,7 @@ export default function HomePage() {
       <MasterplanSection numeral="III" />
       <WhyChooseUs numeral="IV" />
       <TestimonialsSection numeral="V" />
-      <EmiCalculator numeral="VI" />
+      <ComparisonSection numeral="VI" />
       <ExploreStrip numeral="VII" />
       <CtaSection />
     </>

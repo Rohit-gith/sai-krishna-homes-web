@@ -7,6 +7,7 @@ import Reveal from '@/components/common/Reveal';
 import CtaSection from '@/components/common/CtaSection';
 import { Lightbox } from '@/features/home/components/GallerySection';
 import EmiCalculator from '@/features/home/components/EmiCalculator';
+import HomeConfigurator from '@/features/projects/HomeConfigurator';
 import VirtualTourSection from '@/features/explore/VirtualTourSection';
 import BrochureModal from '@/features/projects/BrochureModal';
 import LeadershipConnect from '@/features/projects/LeadershipConnect';
@@ -25,7 +26,7 @@ import { cn } from '@/utils/cn';
 const sectionsFor = (p) =>
   [
     ['overview', 'Overview'],
-    ['floor-plans', 'Floor plans'],
+    ['floor-plans', 'Homes & plans'],
     ['pricing', p.priceList ? 'Price list' : 'Area statement'],
     p.walkthroughs?.length ? ['walkthrough', 'Walkthrough'] : null,
     p.tours.length ? ['virtual-tour', '360° Tour'] : null,
@@ -119,7 +120,17 @@ function Hero({ p, onBrochure }) {
           <p className="mt-4 max-w-2xl font-serif text-xl italic text-primary-200 md:text-2xl">{p.headline}</p>
           <div className="mt-7 flex flex-wrap gap-2.5 text-[12.5px] font-semibold text-white">
             <span className="flex items-center gap-2 border border-white/25 bg-white/10 px-3.5 py-2 backdrop-blur"><MapPin className="h-4 w-4 text-primary-300" /> {p.location}</span>
-            <span className="flex items-center gap-2 border border-white/25 bg-white/10 px-3.5 py-2 backdrop-blur"><BadgeCheck className="h-4 w-4 text-primary-300" /> RERA {p.rera}</span>
+            <a
+              href={p.reraUrl || COMPANY.reraVerifyUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Open this project on the official Odisha RERA website"
+              aria-label={`RERA ${p.rera}. Verify on the Odisha RERA website`}
+              className="group flex items-center gap-2 border border-white/25 bg-white/10 px-3.5 py-2 backdrop-blur transition-colors hover:border-primary-300"
+            >
+              <BadgeCheck className="h-4 w-4 text-primary-300" /> RERA {p.rera}
+              <ArrowUpRight className="h-3.5 w-3.5 text-primary-300 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </a>
             <span className="border border-white/25 bg-white/10 px-3.5 py-2 backdrop-blur">{p.configs.join(' · ')}</span>
             {p.startingFrom && (
               <span className="bg-primary-400 px-3.5 py-2 text-navy-950">
@@ -216,76 +227,12 @@ function Overview({ p, view }) {
 }
 
 function FloorPlans({ p, view, onBrochure }) {
-  const [tab, setTab] = useState(0);
-  const [sub, setSub] = useState(0);
-  const fp = p.floorPlans[tab];
-  const shown = fp.views[sub] || fp.views[0];
   return (
     <section id="floor-plans" className="section relative bg-ivory">
       <div aria-hidden className="bg-blueprint pointer-events-none absolute inset-0" />
       <div className="container relative">
-        <ChapterHeading numeral="II" label="Floor plans" title="Find your layout" intro={p.areaNote} />
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Floor plans">
-          {p.floorPlans.map((f, i) => (
-            <button
-              key={f.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === i}
-              onClick={() => {
-                setTab(i);
-                setSub(0);
-              }}
-              className={cn('border px-5 py-3 font-serif text-lg transition-colors md:text-xl', tab === i ? 'border-navy-900 bg-navy-900 text-white' : 'border-navy-900/20 bg-white text-navy-900 hover:border-primary-400')}
-            >
-              {f.label}
-              {f.area && <span className="ml-2 font-sans text-[11px] font-bold tracking-wide opacity-70">{f.area}</span>}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-8 grid gap-10 lg:grid-cols-[1.5fr_1fr] lg:gap-14">
-          <div className="crop-marks mx-3.5">
-            <button type="button" data-cursor="view" onClick={() => view(fp.views, sub)} className="group relative block w-full bg-white p-3 sm:p-5" aria-label={`Open ${shown.alt} full screen`}>
-              <AnimatePresence mode="wait">
-                <motion.img key={shown.src} src={shown.src} alt={shown.alt} loading="lazy" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-h-[30rem] w-full object-contain" />
-              </AnimatePresence>
-              <span className="absolute right-3 top-3 flex items-center gap-1.5 bg-navy-900 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white opacity-90">
-                <Expand className="h-3.5 w-3.5" /> Zoom
-              </span>
-            </button>
-            {fp.viewLabels && (
-              <div className="mt-4 flex flex-wrap gap-4 text-[11px] font-bold uppercase tracking-[0.22em]">
-                {fp.viewLabels.map((l, i) => (
-                  <button key={l} type="button" onClick={() => setSub(i)} aria-pressed={sub === i} className={cn('relative border-b-2 pb-1 before:absolute before:-inset-3 before:content-[""]', sub === i ? 'border-primary-500 text-navy-950' : 'border-transparent text-navy-900/50 hover:text-navy-950')}>
-                    {l}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <p className="font-serif text-4xl font-semibold text-navy-950">{fp.label}</p>
-            {fp.area && <p className="mt-2 text-[12px] font-bold uppercase tracking-[0.22em] text-primary-700">Total area · {fp.area}</p>}
-            <p className="mt-5 text-[16px] leading-[1.8] text-slate-600">{fp.text}</p>
-            <ul className="mt-6 grid grid-cols-2 gap-px border border-navy-900/10 bg-navy-900/10">
-              {fp.rooms.map((r) => (
-                <li key={r} className="bg-white px-4 py-3 text-[14px] font-semibold text-navy-950">{r}</li>
-              ))}
-            </ul>
-            <a
-              href={whatsappLink(`Hello ${COMPANY.shortName}, please share the price for the ${fp.label}${fp.area ? ` (${fp.area})` : ''} at ${p.name}.`)}
-              target="_blank"
-              rel="noreferrer"
-              className="group mt-8 flex items-center justify-between bg-navy-900 px-6 py-4 text-[12px] font-bold uppercase tracking-[0.18em] text-white hover:bg-navy-800"
-            >
-              Get {fp.label} price <ArrowUpRight className="h-4 w-4 text-primary-300" />
-            </a>
-            <button type="button" onClick={onBrochure} className="mt-3 flex w-full items-center justify-between border border-navy-900/20 bg-white px-6 py-4 text-[12px] font-bold uppercase tracking-[0.18em] text-navy-900 hover:border-primary-400">
-              Download brochure <Download className="h-4 w-4 text-primary-600" />
-            </button>
-          </div>
-        </div>
+        <ChapterHeading numeral="II" label="1, 2 & 3 BHK homes" title="Choose your home" intro="Three simple choices. Pick one to see its floor plan, price, rooms and features in one place." />
+        <HomeConfigurator p={p} view={view} onBrochure={onBrochure} />
 
         <Reveal className="mt-20 grid gap-8 lg:grid-cols-[0.8fr_1.6fr] lg:items-start">
           <div>

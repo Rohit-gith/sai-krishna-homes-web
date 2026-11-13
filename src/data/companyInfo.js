@@ -19,6 +19,8 @@ export const COMPANY = {
   mapUrl: 'https://www.google.com/maps/search/?api=1&query=6RWM%2BVR9%20Bhubaneswar',
   cin: '', // TODO: add Sai Krishna Homes' CIN (shown only when filled)
   incorporated: '2010',
+  // Official Odisha RERA project search. Both RERA numbers were checked there on 13 Nov 2026.
+  reraVerifyUrl: 'https://rera.odisha.gov.in/projects',
   workingHours: 'Mon – Sat, 10:00 AM – 6:00 PM',
   social: {
     facebook: 'https://www.facebook.com/people/Sai-Krishna-Residency/61590891552291/',

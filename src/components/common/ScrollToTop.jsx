@@ -26,7 +26,10 @@ const persist = () => {
 };
 
 export default function ScrollToTop() {
-  const { key, hash } = useLocation();
+  const { key: navKey, pathname, hash } = useLocation();
+  // Every fresh page load gets the key "default", so the path is part of the id: otherwise the
+  // home page's saved position would be applied to a different page opened in the same tab.
+  const key = `${navKey}:${pathname}`;
   const navType = useNavigationType();
   const lastY = useRef(typeof window !== 'undefined' ? window.scrollY : 0);
   const prevKey = useRef(key);

@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
-import { ArrowUpRight } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowUpRight, Calculator, X } from 'lucide-react';
 import ChapterHeading from './ChapterHeading';
 import Reveal from '@/components/common/Reveal';
 import { whatsappLink } from '@/utils/whatsapp';
@@ -58,7 +60,8 @@ function Field({ label, value, display, min, max, step, onChange, id }) {
   );
 }
 
-export default function EmiCalculator({ numeral = '✦' } = {}) {
+/** The calculator itself (sliders + result card). Used by the section below and by the pop-up. */
+export function EmiPanel({ compact = false }) {
   const [price, setPrice] = useState(4500000);
   const [downPct, setDownPct] = useState(20);
   const [rate, setRate] = useState(8.5);
@@ -73,16 +76,7 @@ export default function EmiCalculator({ numeral = '✦' } = {}) {
   const principalShare = loan + interest > 0 ? (loan / (loan + interest)) * 100 : 0;
 
   return (
-    <section id="emi" className="section scroll-mt-24 bg-ivory">
-      <div className="container">
-        <ChapterHeading
-          numeral={numeral}
-          label="Plan your purchase"
-          title="Estimate your monthly EMI"
-          intro="Move the sliders to see what owning a Sai Krishna home could cost each month. Ask us for exact prices and our partner-bank offers."
-        />
-
-        <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
+        <div className={compact ? 'grid gap-8 md:grid-cols-[1.15fr_1fr] md:gap-10' : 'grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:gap-16'}>
           <Reveal>
             <Field
               id="emi-price"
@@ -130,7 +124,7 @@ export default function EmiCalculator({ numeral = '✦' } = {}) {
             />
           </Reveal>
 
-          <Reveal delay={0.1} className="flex flex-col bg-navy-950 p-7 text-white sm:p-10">
+          <Reveal delay={0.1} className={`flex flex-col bg-navy-950 p-7 text-white sm:p-10 ${compact ? 'order-first md:order-none' : ''}`}>
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-primary-300">
               Your monthly EMI
             </p>
@@ -180,7 +174,107 @@ export default function EmiCalculator({ numeral = '✦' } = {}) {
             </p>
           </Reveal>
         </div>
+  );
+}
+
+/** Full EMI section (project pages, Explore chapter). */
+export default function EmiCalculator({ numeral = '✦' } = {}) {
+  return (
+    <section id="emi" className="section scroll-mt-24 bg-ivory">
+      <div className="container">
+        <ChapterHeading
+          numeral={numeral}
+          label="Plan your purchase"
+          title="Estimate your monthly EMI"
+          intro="Move the sliders to see what owning a Sai Krishna home could cost each month. Ask us for exact prices and our partner-bank offers."
+        />
+        <EmiPanel />
       </div>
     </section>
+  );
+}
+
+/** The calculator in a pop-up window, opened from a button. */
+export function EmiModal({ open, onClose }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-navy-950/70 backdrop-blur-sm sm:items-center sm:p-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="emi-modal-title"
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 40, opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto bg-ivory px-5 pb-7 pt-6 shadow-2xl sm:px-10 sm:pb-10 sm:pt-9"
+          >
+            <div className="mb-2 flex items-start justify-between gap-4 border-b border-navy-900/10 pb-5">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.32em] text-primary-700">Plan your purchase</p>
+                <h2 id="emi-modal-title" className="mt-2 text-[1.8rem] leading-tight text-navy-950 sm:text-[2.4rem]">
+                  Estimate your monthly EMI
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close EMI calculator"
+                className="flex h-11 w-11 shrink-0 items-center justify-center border border-navy-900/15 text-navy-950 hover:border-primary-500"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <EmiPanel compact />
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
+/** Search-bar style button that opens the EMI pop-up. */
+export function EmiButton({ className = '' }) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={`group flex w-full max-w-md items-center gap-4 border border-primary-300/40 bg-white/[0.06] py-2.5 pl-2.5 pr-5 text-left text-white backdrop-blur transition-colors hover:border-primary-300 hover:bg-white/[0.1] ${className}`}
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center bg-primary-400 text-navy-950">
+          <Calculator className="h-5 w-5" />
+        </span>
+        <span className="flex-1">
+          <span className="block text-[10.5px] font-bold uppercase tracking-[0.28em] text-primary-300">EMI calculator</span>
+          <span className="mt-0.5 block text-[14.5px] text-white/80">What will my monthly instalment be?</span>
+        </span>
+        <ArrowUpRight className="h-5 w-5 text-primary-300 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+      </button>
+      <EmiModal open={open} onClose={close} />
+    </>
   );
 }

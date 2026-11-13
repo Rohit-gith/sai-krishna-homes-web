@@ -1,6 +1,8 @@
 import { useEffect, useId, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, BadgeCheck, CalendarCheck, Phone, Star } from 'lucide-react';
+import { ArrowRight, BadgeCheck, CalendarCheck, Leaf, MapPin, Phone, Star, Wallet } from 'lucide-react';
+import { LANDMARKS, PRICE_CHECK, STARTING_FROM } from '@/data/comparison';
+import { PROJECT_PAGES } from '@/data/projectPages';
 import { COMPANY } from '@/data/companyInfo';
 import { PHOTOS, responsive } from '@/data/projects';
 import { cn } from '@/utils/cn';
@@ -46,27 +48,59 @@ const NIGHT_SLIDES = [
 ];
 const SLIDE_MS = 7000;
 
-const CONFIGS = ['Studio', '1 BHK', '2 BHK', '3 BHK'];
+const CONFIGS = ['1 BHK', '2 BHK', '3 BHK'];
 
-const STATS = [
-  { value: '500+', label: 'Homes' },
-  { value: '6', unit: 'acres', label: 'Township' },
-  { value: '25+', label: 'Amenities' },
+// The three selling points. Every figure comes from data already verified elsewhere on the site:
+// price list + Square Yards (PRICE_CHECK), Google Maps road distances (LANDMARKS), RERA / brochure.
+const pw = LANDMARKS['panchawati-residency'];
+const km = (name) => pw.find((p) => p.name.startsWith(name))?.km;
+const belowPct = Math.round(((PRICE_CHECK.market.rate - PRICE_CHECK.ours.avg) / PRICE_CHECK.market.rate) * 100);
+const SELLING = [
+  {
+    icon: Wallet,
+    kicker: 'Affordable',
+    title: `Homes from ₹${(STARTING_FROM / 1e5).toFixed(2).replace(/.?0+$/, '')} L`,
+    short: `from ₹${(STARTING_FROM / 1e5).toFixed(2).replace(/.?0+$/, '')} L, ${belowPct}% below the ${PRICE_CHECK.market.area} average`,
+    proof: `Panchawati is ${belowPct}% below the ${PRICE_CHECK.market.area} average rate, with a pool, gym and 20 amenities.`,
+  },
+  {
+    icon: MapPin,
+    kicker: 'Close by',
+    title: `KIIT ${km('KIIT')} km · KIMS ${km('KIMS')} km`,
+    short: `from Panchawati, KIIT ${km('KIIT')} km, KIMS ${km('KIMS')} km, airport ${km('Biju')} km`,
+    proof: `From Panchawati by road: airport ${km('Biju')} km, railway station ${km('Bhubaneswar Railway')} km.`,
+  },
+  {
+    icon: Leaf,
+    kicker: 'Green living',
+    title: 'Solar · Rainwater · STP · EV',
+    short: 'lush green surroundings, 74 new trees, solar, rainwater harvesting, STP and EV charging at Panchawati',
+    proof: 'At Panchawati: rooftop solar, rainwater harvesting, sewage treatment, EV charging and 74 trees planned (RERA).',
+  },
 ];
 
+const RERA = PROJECT_PAGES.map((p) => ({ name: p.name, rera: p.rera, url: p.reraUrl }));
+
+// Panchawati Residency's own Google Maps listing (website saikrishnahomes.co.in). Checked 13 Nov 2026.
+// Update rating/count when they change; never show a number that is not on the listing.
+const GOOGLE = { rating: 4.8, reviews: 4, url: 'https://www.google.com/maps?cid=10468983929573672464', name: 'Panchawati Residency' };
+
+// Amenities actually listed in the two projects' brochures.
 const AMENITIES = [
   'Swimming Pool',
   'Sports Arena',
-  'Gymnasium',
-  'Yoga Deck',
-  'Rooftop Lounge',
-  'Indoor Cricket',
-  'Badminton Courts',
-  'Spa',
-  'Party Lawn',
-  'Indoor Games',
-  'Community Centre',
-  'Café',
+  'Modern Gym',
+  'Yoga Room',
+  'A/C Society Hall',
+  'Jogging Track',
+  'Basketball Court',
+  'Badminton Court',
+  "Kids' Play Area",
+  'Rooftop Solar',
+  'Rainwater Harvesting',
+  'EV Charging',
+  'Temple & Market Complex',
+  '24/7 Security',
 ];
 
 /** Headline that rises in word by word from behind a mask. */
@@ -296,11 +330,28 @@ export default function HeroSection() {
                 {...rise(0.8)}
                 className="mt-5 text-[1.05rem] leading-[1.75] text-slate-600"
               >
-                Studio to 3 BHK residences in a 6-acre gated township, with a private sports arena,
-                an in-house shopping hub and every approval in place.
+                1, 2 &amp; 3 BHK homes in Patia and South Bhubaneswar, with every approval in place.
               </motion.p>
 
-              <motion.div {...rise(0.9)} className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <motion.ul {...rise(0.85)} className="mt-6 space-y-2.5">
+                {SELLING.map(({ icon: Icon, kicker, short }, i) => (
+                  <li key={kicker} className="flex items-center gap-3 text-[14.5px] leading-snug text-navy-950">
+                    <span
+                      className={cn(
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+                        i === 2 ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-white text-primary-700 ring-1 ring-primary-200',
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span>
+                      <span className={cn('font-semibold', i === 2 ? 'text-emerald-800' : 'text-navy-950')}>{kicker}:</span> {short}
+                    </span>
+                  </li>
+                ))}
+              </motion.ul>
+
+              <motion.div {...rise(0.9)} className="mt-7 flex flex-col gap-3 sm:flex-row">
                 <Magnetic>
                   <a
                     href="#book-visit"
@@ -320,30 +371,41 @@ export default function HeroSection() {
 
               <motion.div
                 {...rise(1)}
-                className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4 border-t border-primary-200/70 pt-6"
+                className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-3"
               >
-                <dl className="flex divide-x divide-primary-200">
-                  {STATS.map((s) => (
-                    <div key={s.label} className="px-4 first:pl-0">
-                      <dt className="sr-only">{s.label}</dt>
-                      <dd>
-                        <span className="font-serif text-2xl font-semibold text-navy-950">
-                          {s.value}
-                          {s.unit && (
-                            <span className="ml-1 text-xs font-medium text-primary-600">
-                              {s.unit}
-                            </span>
-                          )}
-                        </span>
-                        <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          {s.label}
-                        </span>
-                      </dd>
-                    </div>
+                <a
+                  href={GOOGLE.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`${GOOGLE.name} on Google Maps: read the reviews`}
+                  className="flex w-full items-center gap-2 text-[13px] text-navy-900 hover:text-primary-700"
+                >
+                  <span className="flex text-primary-500">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} className={cn('h-4 w-4', i < Math.round(GOOGLE.rating) ? 'fill-current' : '')} />
+                    ))}
+                  </span>
+                  <span className="font-serif text-[1.15rem] font-semibold">{GOOGLE.rating}</span>
+                  <span className="font-medium text-navy-900">
+                    on Google · {GOOGLE.reviews} reviews of {GOOGLE.name} ↗
+                  </span>
+                </a>
+                <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.16em] text-navy-900">
+                  <BadgeCheck className="h-5 w-5 text-primary-600" /> RERA registered
+                </span>
+                <span className="flex flex-wrap gap-2">
+                  {RERA.map((r) => (
+                    <a
+                      key={r.rera}
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`${r.name}: open the official Odisha RERA record`}
+                      className="border border-primary-200 bg-white px-2.5 py-1 text-[11.5px] font-semibold text-navy-900 transition-colors hover:border-primary-500"
+                    >
+                      {r.rera} ↗
+                    </a>
                   ))}
-                </dl>
-                <span className="flex items-center gap-2 text-[13px] font-semibold text-navy-900">
-                  <BadgeCheck className="h-5 w-5 text-primary-600" /> RERA approved
                 </span>
               </motion.div>
             </motion.div>
@@ -355,17 +417,6 @@ export default function HeroSection() {
               transition={{ duration: 0.9, delay: 1.1, ease }}
               className="hidden flex-col items-end gap-3 lg:flex"
             >
-              <div className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-soft backdrop-blur">
-                <span className="font-serif text-2xl font-semibold text-navy-950">4.8</span>
-                <span>
-                  <span className="flex text-primary-500">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className="h-3.5 w-3.5 fill-current" />
-                    ))}
-                  </span>
-                  <span className="text-[11px] text-slate-500">1,000+ resident reviews</span>
-                </span>
-              </div>
               <div
                 className="flex gap-2 rounded-2xl bg-white/90 p-2 shadow-soft backdrop-blur"
                 role="tablist"

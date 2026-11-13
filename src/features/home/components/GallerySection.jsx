@@ -74,21 +74,26 @@ export function Lightbox({ items, index, onClose, onNav }) {
             className={cn('relative max-w-full overflow-hidden rounded-2xl shadow-2xl', multi && 'cursor-grab active:cursor-grabbing')}
           >
             <img src={item.src} alt={item.alt} className="block max-h-[80vh] max-w-full object-contain" />
-            {/* watermark: full-size views carry the brand if someone screenshots them */}
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 flex select-none items-center justify-center"
-            >
-              <span className="-rotate-12 whitespace-nowrap font-serif text-[clamp(0.85rem,2.6vw,2rem)] uppercase tracking-[0.3em] text-white/25 [text-shadow:0_1px_3px_rgba(0,0,0,0.35)]">
-                Sai Krishna Homes
-              </span>
-            </span>
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute bottom-3 right-4 select-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/60 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]"
-            >
-              © Sai Krishna Homes
-            </span>
+            {item.plain ? null : (
+              /* plain: nearby-landmark photos (not ours) show no brand mark; everything else keeps it */
+              <>
+                {/* watermark: full-size views carry the brand if someone screenshots them */}
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 flex select-none items-center justify-center"
+                >
+                  <span className="-rotate-12 whitespace-nowrap font-serif text-[clamp(0.85rem,2.6vw,2rem)] uppercase tracking-[0.3em] text-white/25 [text-shadow:0_1px_3px_rgba(0,0,0,0.35)]">
+                    Sai Krishna Homes
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-3 right-4 select-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/60 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]"
+                >
+                  © Sai Krishna Homes
+                </span>
+              </>
+            )}
           </motion.div>
         </AnimatePresence>
         {multi && [-1, 1].map((dir) => (
