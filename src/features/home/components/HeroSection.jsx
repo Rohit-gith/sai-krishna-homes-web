@@ -378,7 +378,7 @@ export default function HeroSection() {
                   target="_blank"
                   rel="noreferrer"
                   title={`${GOOGLE.name} on Google Maps: read the reviews`}
-                  className="flex w-full items-center gap-2 text-[13px] text-navy-900 hover:text-primary-700"
+                  className="flex w-full items-center gap-2 text-[13px] text-navy-900 hover:text-primary-700 lg:hidden"
                 >
                   <span className="flex text-primary-500">
                     {Array.from({ length: 5 }).map((_, i) => (
@@ -417,6 +417,25 @@ export default function HeroSection() {
               transition={{ duration: 0.9, delay: 1.1, ease }}
               className="hidden flex-col items-end gap-3 lg:flex"
             >
+              <a
+                href={GOOGLE.url}
+                target="_blank"
+                rel="noreferrer"
+                title={`${GOOGLE.name} on Google Maps: read the reviews`}
+                className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-soft backdrop-blur transition-colors hover:bg-white"
+              >
+                <span className="font-serif text-2xl font-semibold text-navy-950">{GOOGLE.rating}</span>
+                <span>
+                  <span className="flex text-primary-500">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} className={cn('h-3.5 w-3.5', i < Math.round(GOOGLE.rating) ? 'fill-current' : '')} />
+                    ))}
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    {GOOGLE.reviews} Google reviews · {GOOGLE.name} ↗
+                  </span>
+                </span>
+              </a>
               <div
                 className="flex gap-2 rounded-2xl bg-white/90 p-2 shadow-soft backdrop-blur"
                 role="tablist"
