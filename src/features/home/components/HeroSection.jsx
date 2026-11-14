@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, BadgeCheck, CalendarCheck, Leaf, MapPin, Phone, Star, Wallet } from 'lucide-react';
+import { ArrowRight, BadgeCheck, CalendarCheck, Leaf, MapPin, Star, Wallet } from 'lucide-react';
 import { LANDMARKS, PRICE_CHECK, STARTING_FROM } from '@/data/comparison';
 import { PROJECT_PAGES } from '@/data/projectPages';
 import { COMPANY } from '@/data/companyInfo';
@@ -9,7 +9,7 @@ import { cn } from '@/utils/cn';
 import logoImg from '@/assets/logo/logo.png';
 import Magnetic from '@/components/common/Magnetic';
 import { useThemeStore } from '@/store/useThemeStore';
-import { useCrmStore } from '@/features/admin/store/useCrmStore';
+import { useSchedulerStore } from '@/store/useSchedulerStore';
 
 const ease = [0.22, 1, 0.36, 1];
 const rise = (delay = 0) => ({
@@ -53,7 +53,7 @@ const CONFIGS = ['1 BHK', '2 BHK', '3 BHK'];
 // The three selling points. Every figure comes from data already verified elsewhere on the site:
 // price list + Square Yards (PRICE_CHECK), Google Maps road distances (LANDMARKS), RERA / brochure.
 const pw = LANDMARKS['panchawati-residency'];
-const km = (name) => pw.find((p) => p.name.startsWith(name))?.km;
+const mins = (name) => pw.find((p) => p.name.startsWith(name))?.mins;
 const belowPct = Math.round(((PRICE_CHECK.market.rate - PRICE_CHECK.ours.avg) / PRICE_CHECK.market.rate) * 100);
 const SELLING = [
   {
@@ -66,9 +66,9 @@ const SELLING = [
   {
     icon: MapPin,
     kicker: 'Close by',
-    title: `KIIT ${km('KIIT')} km · KIMS ${km('KIMS')} km`,
-    short: `from Panchawati, KIIT ${km('KIIT')} km, KIMS ${km('KIMS')} km, airport ${km('Biju')} km`,
-    proof: `From Panchawati by road: airport ${km('Biju')} km, railway station ${km('Bhubaneswar Railway')} km.`,
+    title: `Patia station ${mins('Patia')} min · KIIT Square ${mins('KIIT')} min`,
+    short: `from Panchawati, Patia station just ${mins('Patia')} min, KIIT Square ${mins('KIIT')} min, Esplanade One ${mins('Esplanade')} min`,
+    proof: `From Panchawati by road: Esplanade One ${mins('Esplanade')} min, airport ${mins('Biju')} min.`,
   },
   {
     icon: Leaf,
@@ -151,7 +151,7 @@ function Seal() {
   );
 }
 
-/** Hotel-style booking bar: pick a configuration, leave name + mobile, confirm on WhatsApp. */
+/** Hotel-style booking bar: pick a configuration, leave name + mobile, then choose a date & time. */
 function VisitBar() {
   const [config, setConfig] = useState('2 BHK');
   const [name, setName] = useState('');
@@ -164,13 +164,8 @@ function VisitBar() {
     if (!/^[6-9]\d{9}$/.test(phone))
       return setError('Please enter a valid 10-digit mobile number.');
     setError('');
-    useCrmStore.getState().captureEnquiry({ form: 'Site visit (home page)', name: name.trim(), phone, interest: config, message: 'Wants to book a site visit' });
-    const msg = `Hello ${COMPANY.shortName}, I'd like to book a site visit.\n\nName: ${name.trim()}\nMobile: ${phone}\nLooking for: ${config}`;
-    window.open(
-      `https://wa.me/${COMPANY.whatsapp}?text=${encodeURIComponent(msg)}`,
-      '_blank',
-      'noopener',
-    );
+    // Continue in the scheduler (date & time), with what was typed here already filled in.
+    useSchedulerStore.getState().openScheduler({ name: name.trim(), phone, config });
     return undefined;
   };
 
@@ -180,7 +175,6 @@ function VisitBar() {
 
   return (
     <form
-      id="book-visit"
       onSubmit={submit}
       noValidate
       className="relative scroll-mt-28 rounded-[1.75rem] border border-white bg-white p-3 shadow-[0_30px_80px_-25px_rgba(8,38,32,0.45)]"
@@ -245,7 +239,7 @@ function VisitBar() {
           className="group flex items-center justify-center gap-2.5 rounded-2xl bg-navy-900 px-8 py-4 text-[12px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-navy-800"
         >
           <CalendarCheck className="h-5 w-5 text-primary-300" />
-          Book a site visit
+          Choose date &amp; time
           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
         </button>
       </div>
@@ -361,12 +355,6 @@ export default function HeroSection() {
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </a>
                 </Magnetic>
-                <a
-                  href={`tel:${COMPANY.phone}`}
-                  className="inline-flex items-center justify-center gap-2.5 border border-navy-200 bg-white px-6 py-4 text-[12px] font-bold uppercase tracking-[0.16em] text-navy-900 transition-colors hover:border-primary-400"
-                >
-                  <Phone className="h-4 w-4 text-primary-600" /> {COMPANY.phoneDisplay}
-                </a>
               </motion.div>
 
               <motion.div
@@ -400,10 +388,12 @@ export default function HeroSection() {
                       href={r.url}
                       target="_blank"
                       rel="noreferrer"
-                      title={`${r.name}: open the official Odisha RERA record`}
-                      className="border border-primary-200 bg-white px-2.5 py-1 text-[11.5px] font-semibold text-navy-900 transition-colors hover:border-primary-500"
+                      title={`${r.name} · RERA ${r.rera}: open the official Odisha RERA record`}
+                      aria-label={`${r.name}, RERA ${r.rera}. Open the official Odisha RERA record`}
+                      className="group border border-primary-200 bg-white px-3 py-1.5 leading-tight transition-colors hover:border-primary-500"
                     >
-                      {r.rera} ↗
+                      <span className="block text-[12px] font-semibold text-navy-900">{r.name} ↗</span>
+                      <span className="block text-[10.5px] font-medium tracking-wide text-slate-500 group-hover:text-primary-700">RERA {r.rera}</span>
                     </a>
                   ))}
                 </span>

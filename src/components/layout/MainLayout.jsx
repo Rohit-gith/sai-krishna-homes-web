@@ -11,6 +11,7 @@ import BackToTop from '@/components/common/BackToTop';
 import PageLoader from '@/components/common/PageLoader';
 import Toast from '@/components/ui/Toast';
 import MediaGuard from '@/components/common/MediaGuard';
+import SchedulerModal from '@/features/scheduler/SchedulerModal';
 
 /** Frame shared by every page: TopBar + Navbar + page content + Footer. */
 export default function MainLayout() {
@@ -31,6 +32,7 @@ export default function MainLayout() {
       <BackToTop />
       <Toast />
       <MediaGuard />
+      <SchedulerModal />
     </div>
   );
 }

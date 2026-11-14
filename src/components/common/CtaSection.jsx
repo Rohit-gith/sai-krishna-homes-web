@@ -3,7 +3,6 @@ import Reveal from './Reveal';
 import ParallaxImage from './ParallaxImage';
 import { COMPANY } from '@/data/companyInfo';
 import { PHOTOS, responsive } from '@/data/projects';
-import { whatsappLink } from '@/utils/whatsapp';
 
 /** "Visit us" call-to-action band with a photo backdrop, shown above the footer. */
 export default function CtaSection() {
@@ -30,9 +29,7 @@ export default function CtaSection() {
             </p>
             <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
               <a
-                href={whatsappLink('Hello Sai Krishna Homes, I would like to book a site visit.')}
-                target="_blank"
-                rel="noreferrer"
+                href="#book-visit"
                 className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-primary-500 to-primary-300 px-8 py-4 text-[12px] font-bold uppercase tracking-[0.18em] text-navy-950 shadow-gold transition hover:brightness-105"
               >
                 <CalendarCheck className="h-5 w-5" /> Book a site visit

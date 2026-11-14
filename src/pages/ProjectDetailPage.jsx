@@ -141,9 +141,8 @@ function Hero({ p, onBrochure }) {
           </div>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <a
-              href={whatsappLink(`Hello ${COMPANY.shortName}, I'd like to book a site visit at ${p.name}.`)}
-              target="_blank"
-              rel="noreferrer"
+              href="#book-visit"
+              data-project={p.slug}
               className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-primary-500 to-primary-300 px-8 py-4 text-[12px] font-bold uppercase tracking-[0.18em] text-navy-950 shadow-gold"
             >
               Book a site visit <ArrowUpRight className="h-4 w-4" />

@@ -1,59 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, animate, motion, useInView, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import {
-  ArrowUpRight,
-  BadgeCheck,
-  Building2,
-  Bus,
-  Check,
-  Expand,
-  GraduationCap,
-  HeartPulse,
-  Hospital,
-  Landmark,
-  Leaf,
-  Milestone,
-  Navigation,
-  Plane,
-  School,
-  Sparkles,
-  TrainFront,
-  Wallet,
-} from 'lucide-react';
+import { ArrowUpRight, BadgeCheck, Check, Leaf, Sparkles, Wallet } from 'lucide-react';
 import ChapterHeading from './ChapterHeading';
 import Reveal from '@/components/common/Reveal';
 import { EmiButton } from './EmiCalculator';
 import { Lightbox } from './GallerySection';
+import NearbyShowcase from './NearbyShowcase';
+import RadialMap from './RadialMap';
 import {
   COMPARE_FACTS,
   COMPARE_FEATURES,
   COMPARE_PROJECTS,
   DISTANCE_SOURCE,
   LANDMARKS,
+  ORIGIN,
   PHOTO_CREDITS,
   PRICE_CHECK,
   PRICE_NOTE,
   STARTING_FROM,
-  routeUrl,
 } from '@/data/comparison';
 import { projectPath } from '@/data/projectPages';
 import { COMPANY } from '@/data/companyInfo';
 import { cn } from '@/utils/cn';
 
-const ICONS = {
-  Airport: Plane,
-  Railway: TrainFront,
-  College: GraduationCap,
-  Institute: GraduationCap,
-  School,
-  Hospital,
-  'Cancer care': HeartPulse,
-  RBI: Landmark,
-  'IT hub': Building2,
-  Highway: Milestone,
-  Bus,
-};
 
 const GREEN = new Set(COMPARE_FEATURES.find(([g]) => g === 'Green living')[1].map(([f]) => f));
 const ALL_FEATURES = COMPARE_FEATURES.flatMap(([, items]) => items);
@@ -157,254 +127,30 @@ function ProjectPanel({ project, col }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Part 2 · life around you: every place on its own lane, to scale     */
+/* Part 2 · life around you: the project in the middle, places around  */
 /* ------------------------------------------------------------------ */
-
-/* Side-view vehicles, facing right, drawn in currentColor. */
-function PlaneIcon(props) {
-  return (
-    <svg viewBox="0 0 40 20" aria-hidden="true" {...props}>
-      <path
-        fill="currentColor"
-        d="M3 9.2 6.2 9.6 2.6 3h3.2l6.4 6.8 9.6-.6L16.6 1h3.6l8.4 8.1 6.2-.3c2.6-.1 4.6.6 4.6 1.2s-2 1.3-4.6 1.2l-6.2-.3-8.4 8.1h-3.6l5.2-8.2-9.6-.6-6.4 6.8H2.6l3.6-6.6-3.2.4C1.6 10.9 1 10.5 1 10s.6-.9 2-.8Z"
-      />
-    </svg>
-  );
-}
-function TrainIcon(props) {
-  return (
-    <svg viewBox="0 0 44 20" aria-hidden="true" {...props}>
-      <path fill="currentColor" d="M2 3.5C2 2.7 2.7 2 3.5 2H30c5.2 0 9.6 3.4 11.2 8.4l.6 2.1c.3 1-.4 2-1.5 2H3.5c-.8 0-1.5-.7-1.5-1.5Z" />
-      <path fill="#06120e" d="M5 5h5v4H5zm7 0h5v4h-5zm7 0h5v4h-5zm8 0h3.5c2.6 0 4.9 1.6 5.9 4H27Z" opacity=".75" />
-      <circle cx="9" cy="17" r="2.2" fill="currentColor" />
-      <circle cx="16" cy="17" r="2.2" fill="currentColor" />
-      <circle cx="27" cy="17" r="2.2" fill="currentColor" />
-      <circle cx="34" cy="17" r="2.2" fill="currentColor" />
-    </svg>
-  );
-}
-function CarIcon(props) {
-  return (
-    <svg viewBox="0 0 40 20" aria-hidden="true" {...props}>
-      <path fill="currentColor" d="M3 11.5c0-1.2.8-2.2 2-2.5l5.3-1.3 5.2-4.2c.9-.7 2-1.1 3.1-1.1h7.1c1.3 0 2.5.6 3.3 1.6l3.1 3.8 3.6.9c1.3.3 2.3 1.5 2.3 2.9v2.9c0 .8-.7 1.5-1.5 1.5H4.5c-.8 0-1.5-.7-1.5-1.5Z" />
-      <path fill="#06120e" d="M16.6 5.2c.5-.4 1.2-.7 1.9-.7h3.7v3.6h-8.8Zm7.4-.7h1.9c.8 0 1.5.4 2 1l1.7 2.6H24Z" opacity=".75" />
-      <circle cx="11" cy="16" r="3" fill="currentColor" stroke="#06120e" strokeWidth="1.6" />
-      <circle cx="31" cy="16" r="3" fill="currentColor" stroke="#06120e" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
-const MODE = { Airport: 'air', Railway: 'rail' };
-const VEHICLE = { air: PlaneIcon, rail: TrainIcon, road: CarIcon };
-
-/** The lane's track: a flight path, a railway or a road. `gold` is the travelled part. */
-function Track({ mode, gold = false }) {
-  const c = gold ? '#d4a64a' : 'rgba(255,255,255,0.16)';
-  if (mode === 'air')
-    return <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t-2 border-dotted" style={{ borderColor: c }} />;
-  if (mode === 'rail')
-    return (
-      <span
-        className="absolute inset-x-0 top-1/2 h-[9px] -translate-y-1/2 border-y-2"
-        style={{
-          borderColor: c,
-          backgroundImage: `repeating-linear-gradient(90deg, ${c} 0 2px, transparent 2px 9px)`,
-        }}
-      />
-    );
-  return (
-    <span className="absolute inset-x-0 top-1/2 h-[7px] -translate-y-1/2 rounded-full" style={{ background: gold ? 'rgba(212,166,74,0.9)' : 'rgba(255,255,255,0.1)' }}>
-      <span
-        className="absolute inset-x-1 top-1/2 h-px -translate-y-1/2"
-        style={{ backgroundImage: `repeating-linear-gradient(90deg, ${gold ? '#06120e' : 'rgba(255,255,255,0.35)'} 0 6px, transparent 6px 12px)` }}
-      />
-    </span>
-  );
-}
-
-/** Cover for places that have no free photo yet: emerald field, gold hairlines, the place's icon. */
-function PlaceCover({ Icon }) {
-  return (
-    <span className="relative flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_20%,#1e4a3e,#06150f_70%)]">
-      <span
-        aria-hidden="true"
-        className="absolute inset-0 opacity-[0.12] [background-image:repeating-linear-gradient(135deg,#d4a64a_0_1px,transparent_1px_14px)]"
-      />
-      <span className="relative flex h-20 w-20 items-center justify-center rounded-full border border-primary-300/50 bg-[#06150f]/70 text-primary-300 shadow-[0_0_0_10px_rgba(212,166,74,0.06)] lg:h-16 lg:w-16">
-        <Icon className="h-9 w-9 lg:h-7 lg:w-7" strokeWidth={1.4} />
-      </span>
-    </span>
-  );
-}
-
-function Lane({ place, from, maxKm, index, onOpen }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-12% 0px' });
-  const reduce = useReducedMotion();
-  const [val, setVal] = useState(0);
-  const mode = MODE[place.cat] || 'road';
-  const Vehicle = VEHICLE[mode];
-  const Icon = ICONS[place.cat] || Navigation;
-  // square-root scale: order and "further = longer" are kept, near places stay readable on phones
-  const pct = 18 + 82 * Math.sqrt(place.km / maxKm);
-  const duration = reduce ? 0 : 1.2 + 1.8 * (place.km / maxKm);
-  const delay = reduce ? 0 : Math.min(index, 6) * 0.12;
-  const ease = [0.33, 1, 0.68, 1];
-  const go = inView || reduce;
-
-  useEffect(() => {
-    if (!go) return undefined;
-    const c = animate(0, place.km, { duration, delay, ease, onUpdate: setVal });
-    return () => c.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [go, place.km]);
-
-  // The photo opens full size; the rest of the row opens the live route (an overlay link, so the
-  // photo button is not nested inside a link).
-  const Pic = place.photo ? 'button' : 'span';
-  const picProps = place.photo ? { type: 'button', onClick: onOpen, 'aria-label': `View photo: ${place.name}` } : {};
-
-  return (
-    <div
-      ref={ref}
-      className="group relative block border-b border-white/[0.08] py-6 transition-colors hover:bg-white/[0.025] lg:grid lg:grid-cols-[13rem_15rem_minmax(0,1fr)] lg:items-center lg:gap-x-8 lg:px-3"
-    >
-      {place.q && (
-        <a
-          href={routeUrl(from, place.q)}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`${place.name}, ${place.km} km. Open the live route in Google Maps`}
-          className="absolute inset-0 z-[1]"
-        />
-      )}
-      {/* photo (big banner on phones, framed picture on desktop); tap to enlarge */}
-      <Pic
-        {...picProps}
-        data-cursor={place.photo ? 'view' : undefined}
-        className="group/pic relative z-[2] block aspect-[16/9] w-full overflow-hidden bg-navy-900 text-left lg:aspect-[3/2]"
-      >
-        {place.photo ? (
-          <img
-            src={`/images/nearby/${place.photo}.webp`}
-            alt={place.name}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-          />
-        ) : (
-          <PlaceCover Icon={Icon} />
-        )}
-        {place.photo && (
-          <span
-            aria-hidden="true"
-            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center bg-black/45 text-white backdrop-blur-md transition-colors group-hover/pic:bg-primary-400 group-hover/pic:text-navy-950 lg:right-2 lg:top-2 lg:h-8 lg:w-8"
-          >
-            <Expand className="h-4 w-4" />
-          </span>
-        )}
-        {/* phones: name and distance on the picture */}
-        <span className="absolute inset-0 bg-gradient-to-t from-[#04100c]/95 via-[#04100c]/30 to-transparent lg:hidden" />
-        <span className="absolute left-3 top-3 flex items-center gap-1.5 bg-black/40 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white backdrop-blur-md lg:hidden">
-          <Icon className="h-3.5 w-3.5" /> {place.cat}
-        </span>
-        <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 lg:hidden">
-          <span className="font-serif text-[1.3rem] leading-tight text-white">{place.name}</span>
-          <span className="shrink-0 whitespace-nowrap">
-            <span className="font-serif text-[2rem] leading-none text-primary-300">{val.toFixed(1)}</span>
-            <span className="ml-1 text-[10.5px] font-bold uppercase tracking-[0.2em] text-primary-200">km</span>
-          </span>
-        </span>
-      </Pic>
-
-      {/* desktop: name */}
-      <span className="hidden min-w-0 lg:block">
-        <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-white/45">
-          <Icon className="h-3 w-3" /> {place.cat}
-        </span>
-        <span className="mt-1.5 block font-serif text-[1.3rem] leading-snug text-white">{place.name}</span>
-      </span>
-
-      {/* the lane (full width on its own row on mobile) */}
-      <span className="relative mx-1 mt-5 block h-10 lg:mx-0 lg:mt-0 lg:mr-36">
-        {/* start: home */}
-        <span className="absolute left-0 top-1/2 z-[2] h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-primary-300 shadow-[0_0_0_4px_rgba(212,166,74,0.18)]" />
-        <span className="absolute inset-y-0 left-0" style={{ width: `${pct}%` }}>
-          <Track mode={mode} />
-          <motion.span
-            className="absolute inset-0"
-            initial={{ clipPath: 'inset(0 100% 0 0)' }}
-            animate={go ? { clipPath: 'inset(0 0% 0 0)' } : undefined}
-            transition={{ duration, delay, ease }}
-          >
-            <Track mode={mode} gold />
-          </motion.span>
-          {/* destination pin */}
-          {/* outer span positions it; the inner one animates (framer's transform would drop the translate) */}
-          <span className="absolute right-0 top-1/2 z-[2] h-3.5 w-3.5 -translate-y-1/2 translate-x-1/2">
-            <motion.span
-              className="block h-full w-full rounded-full border-2 border-primary-300 bg-[#06120e]"
-              initial={{ scale: 0.6 }}
-              animate={go ? { scale: [0.6, 0.6, 1.25, 1], backgroundColor: ['#06120e', '#06120e', '#d4a64a', '#d4a64a'] } : undefined}
-              transition={{ duration: duration + 0.35, delay, times: [0, 0.75, 0.9, 1] }}
-            />
-          </span>
-          {/* the vehicle */}
-          <motion.span
-            className={cn('absolute z-[3] -translate-x-full', mode === 'air' ? '-top-2' : 'top-1/2 -translate-y-1/2')}
-            initial={{ left: '0%' }}
-            animate={go ? { left: '100%' } : undefined}
-            transition={{ duration, delay, ease }}
-          >
-            <motion.span
-              className="block text-primary-200 drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
-              animate={mode === 'air' && !reduce ? { y: [0, -3, 0] } : undefined}
-              transition={mode === 'air' ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' } : undefined}
-            >
-              <Vehicle className={cn('-mr-2', mode === 'rail' ? 'h-6 w-[3.25rem]' : 'h-6 w-12')} />
-            </motion.span>
-          </motion.span>
-          {/* desktop: the distance sits right where the drive ends */}
-          <span className="absolute left-full top-1/2 ml-6 hidden -translate-y-1/2 items-baseline whitespace-nowrap lg:flex">
-            <span className="font-serif text-[2.3rem] leading-none text-primary-300">{val.toFixed(1)}</span>
-            <span className="ml-1.5 text-[10.5px] font-bold uppercase tracking-[0.2em] text-primary-200">km</span>
-          </span>
-        </span>
-      </span>
-
-    </div>
-  );
-}
-
-function OtherPlace({ place, from }) {
-  const Icon = ICONS[place.cat] || Navigation;
-  const Row = place.q ? 'a' : 'div';
-  const linkProps = place.q ? { href: routeUrl(from, place.q), target: '_blank', rel: 'noreferrer' } : {};
-  return (
-    <Row
-      {...linkProps}
-      className="group flex items-center gap-3 border border-white/10 px-4 py-3 transition-colors hover:border-primary-300/60 hover:bg-white/[0.03]"
-    >
-      <Icon className="h-4 w-4 shrink-0 text-primary-300" />
-      <span className="min-w-0 flex-1 text-[13.5px] leading-snug text-white/85">{place.name}</span>
-      <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.16em] text-primary-300">
-        {place.time ? `${place.time} drive` : 'Route ↗'}
-      </span>
-    </Row>
-  );
-}
 
 function LifeAround() {
   const [slug, setSlug] = useState(COMPARE_PROJECTS[0].slug);
   const project = COMPARE_PROJECTS.find((p) => p.slug === slug);
   const places = LANDMARKS[slug];
-  const lanes = places.filter((p) => p.km != null).sort((a, b) => a.km - b.km);
-  const others = places.filter((p) => p.km == null);
-  const maxKm = Math.max(...lanes.map((p) => p.km));
-  // full-size photo viewer for the lanes
-  const photos = lanes.filter((p) => p.photo);
-  const slides = photos.map((p) => {
-    return { src: `/images/nearby/${p.photo}.webp`, alt: p.name, title: `${p.name} · ${p.km} km`, plain: true };
-  });
+  // map: every place with its travel mode; the highlighted route cycles until the visitor hovers a photo
+  const mapItems = places.map((p, i) => ({ ...p, i, m: p.cat === 'Airport' ? 'air' : p.cat === 'Railway' ? 'rail' : 'road' }));
+  const [active, setActive] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setActive((i) => (i + 1) % places.length), 4500);
+    return () => clearTimeout(t);
+  }, [active, places.length]);
+  useEffect(() => setActive(0), [slug]);
+
+  // full-size photo viewer (landmark photos are not ours: no watermark)
+  const photos = places.filter((p) => p.photo);
+  const slides = photos.map((p) => ({
+    src: `/images/nearby/${p.photo}.webp`,
+    alt: p.name,
+    title: `${p.name}${p.mins != null ? ` · ${p.mins} min` : p.km != null ? ` · ${p.km} km` : ''}`,
+    plain: true,
+  }));
   const [open, setOpen] = useState(null);
   const closeViewer = useCallback(() => setOpen(null), []);
   const navViewer = useCallback((d) => setOpen((i) => (i + d + slides.length) % slides.length), [slides.length]);
@@ -422,7 +168,7 @@ function LifeAround() {
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.35em] text-primary-300">Life around you</p>
             <h3 className="mt-3 max-w-xl font-serif text-[2.1rem] leading-[1.1] text-white md:text-[2.9rem]">
-              Everything that matters, close to home
+              Big facilities, minutes from home
             </h3>
           </div>
           <div role="tablist" aria-label="Choose a project" className="flex self-start border border-white/15 p-1 md:self-auto">
@@ -444,40 +190,67 @@ function LifeAround() {
           </div>
         </Reveal>
 
-        {/* legend */}
-        <div className="mt-10 flex flex-col gap-4 border-y border-white/10 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="flex items-center gap-2 text-[13px] text-white/60">
-            <span className="h-2.5 w-2.5 rounded-full bg-primary-300 shadow-[0_0_0_4px_rgba(212,166,74,0.18)]" />
-            From {project.name}, {project.place} · the longer the line, the longer the drive
-          </p>
-          <ul className="flex flex-wrap gap-x-5 gap-y-2 text-[11px] font-bold uppercase tracking-[0.18em] text-white/55">
-            <li className="flex items-center gap-2"><PlaneIcon className="h-3.5 w-7 text-primary-200" /> By air</li>
-            <li className="flex items-center gap-2"><TrainIcon className="h-3.5 w-7 text-primary-200" /> By rail</li>
-            <li className="flex items-center gap-2"><CarIcon className="h-3.5 w-7 text-primary-200" /> By road</li>
-          </ul>
-        </div>
-
         <AnimatePresence>{open !== null && <Lightbox items={slides} index={open} onClose={closeViewer} onNav={navViewer} />}</AnimatePresence>
 
-        <div key={slug}>
-          {lanes.map((p, i) => (
-            <Lane key={p.name} place={p} from={project.mapsQuery} maxKm={maxKm} index={i} onOpen={() => setOpen(photos.indexOf(p))} />
-          ))}
-        </div>
-
-        {others.length > 0 && (
+        {/* the residency in the middle, a vehicle heading out to every place */}
+        {ORIGIN[slug] && (
           <div className="mt-10">
-            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/45">Also within reach</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {others.map((p) => (
-                <OtherPlace key={p.name} place={p} from={project.mapsQuery} />
-              ))}
-            </div>
+            <RadialMap
+              origin={ORIGIN[slug]}
+              projectInfo={project}
+              places={places}
+              activeName={mapItems[active]?.name}
+              onPick={(p, hover) => {
+                setActive(mapItems.findIndex((x) => x.name === p.name));
+                if (!hover) {
+                  const i = photos.findIndex((x) => x.name === p.name);
+                  if (i >= 0) setOpen(i);
+                }
+              }}
+            />
+            <p className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">
+              <span className="text-primary-300">From {project.name}</span>
+              <span>✈ by air</span>
+              <span>🚆 by rail</span>
+              <span>🚗 by road</span>
+            </p>
           </div>
         )}
 
+        {/* phones: the diagram's photos are small, so add a swipeable strip of big photo cards */}
+        <div className="-mx-4 mt-6 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
+          {[...places]
+            .filter((p) => p.mins != null)
+            .sort((a, b) => a.mins - b.mins)
+            .map((p) => (
+              <button
+                key={p.name}
+                type="button"
+                onClick={() => {
+                  const i = photos.findIndex((x) => x.name === p.name);
+                  if (i >= 0) setOpen(i);
+                }}
+                className="relative w-[72%] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/15 text-left shadow-[0_20px_40px_-20px_rgba(0,0,0,0.9)]"
+              >
+                <span className="block aspect-[4/3] bg-navy-900">
+                  {p.photo && <img src={`/images/nearby/${p.photo}.webp`} alt={p.name} loading="lazy" className="h-full w-full object-cover" />}
+                </span>
+                <span className="absolute inset-0 bg-gradient-to-t from-[#04100c] via-[#04100c]/20 to-transparent" />
+                <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-3.5">
+                  <span className="font-serif text-[1.2rem] leading-tight text-white">{p.name}</span>
+                  <span className="shrink-0 rounded-full bg-primary-400 px-2.5 py-1 text-[12px] font-bold text-navy-950">Just {p.mins} min</span>
+                </span>
+              </button>
+            ))}
+        </div>
+        <p className="mt-2 text-center text-[11px] text-white/45 md:hidden">Swipe to see every place →</p>
+
+        <div className="mt-6">
+          <NearbyShowcase places={places} />
+        </div>
+
         <p className="mt-8 text-[11px] leading-relaxed text-white/35">
-          {DISTANCE_SOURCE[slug]} Tap any place for the live route.{' '}
+          {DISTANCE_SOURCE[slug]} Tap any photo to see it larger.{' '}
           Photos & maps:{' '}
           {credits.map(([who, lic, url], i) => (
             <span key={url || who}>
