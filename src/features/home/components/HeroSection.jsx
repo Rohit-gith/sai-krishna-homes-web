@@ -412,7 +412,7 @@ export default function HeroSection() {
                 target="_blank"
                 rel="noreferrer"
                 title={`${GOOGLE.name} on Google Maps: read the reviews`}
-                className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-soft backdrop-blur transition-colors hover:bg-white"
+                className="mb-8 flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-soft backdrop-blur transition-colors hover:bg-white"
               >
                 <span className="font-serif text-2xl font-semibold text-navy-950">{GOOGLE.rating}</span>
                 <span>
@@ -427,7 +427,7 @@ export default function HeroSection() {
                 </span>
               </a>
               <div
-                className="flex gap-2 rounded-2xl bg-white/90 p-2 shadow-soft backdrop-blur"
+                className="mb-8 flex gap-2 rounded-2xl bg-white/90 p-2 shadow-soft backdrop-blur"
                 role="tablist"
                 aria-label="Featured views"
               >
