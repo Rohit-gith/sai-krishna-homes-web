@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, BadgeCheck, Check, Leaf, Sparkles, Wallet } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck, Building2, Check, GraduationCap, Hospital, Leaf, Sparkles, TrainFront, Wallet } from 'lucide-react';
 import ChapterHeading from './ChapterHeading';
 import Reveal from '@/components/common/Reveal';
 import { EmiButton } from './EmiCalculator';
@@ -130,18 +130,39 @@ function ProjectPanel({ project, col }) {
 /* Part 2 · life around you: the project in the middle, places around  */
 /* ------------------------------------------------------------------ */
 
+/* When a project has many nearby places, the map shows one group at a time so every card stays clear. */
+const PLACE_TAB = { School: 'Education', College: 'Education', Institute: 'Education', Hospital: 'Healthcare', Railway: 'Travel', Airport: 'Travel', Bus: 'Travel', Mall: 'Daily life', 'IT hub': 'Daily life', RBI: 'Daily life', Police: 'Daily life' };
+const TOP = 'Top places'; // the original set, shown first
+const PLACE_TABS = [
+  [TOP, Sparkles],
+  ['Education', GraduationCap],
+  ['Healthcare', Hospital],
+  ['Travel', TrainFront],
+  ['Daily life', Building2],
+];
+const TAB_ABOVE = 10; // more places than this → group tabs
+
 function LifeAround() {
   const [slug, setSlug] = useState(COMPARE_PROJECTS[0].slug);
   const project = COMPARE_PROJECTS.find((p) => p.slug === slug);
-  const places = LANDMARKS[slug];
+  const all = LANDMARKS[slug];
+  const tabbed = all.length > TAB_ABOVE;
+  const inTab = (p, t) => (t === TOP ? !p.added : PLACE_TAB[p.cat] === t);
+  const tabs = PLACE_TABS.map(([t, Icon]) => ({ t, Icon, n: all.filter((p) => inTab(p, t)).length })).filter((x) => x.n);
+  const [tab, setTab] = useState(PLACE_TABS[0][0]);
+  useEffect(() => setTab(PLACE_TABS[0][0]), [slug]);
+  const places = tabbed ? all.filter((p) => inTab(p, tab)) : all;
   // map: every place with its travel mode; the highlighted route cycles until the visitor hovers a photo
   const mapItems = places.map((p, i) => ({ ...p, i, m: p.cat === 'Airport' ? 'air' : p.cat === 'Railway' ? 'rail' : 'road' }));
   const [active, setActive] = useState(0);
+  const lifeRef = useRef(null);
+  const lifeInView = useInView(lifeRef, { margin: '0px' });
   useEffect(() => {
+    if (!lifeInView) return undefined; // nothing to animate while the section is off screen
     const t = setTimeout(() => setActive((i) => (i + 1) % places.length), 4500);
     return () => clearTimeout(t);
-  }, [active, places.length]);
-  useEffect(() => setActive(0), [slug]);
+  }, [active, places.length, lifeInView]);
+  useEffect(() => setActive(0), [slug, tab]);
 
   // full-size photo viewer (landmark photos are not ours: no watermark)
   const photos = places.filter((p) => p.photo);
@@ -154,10 +175,10 @@ function LifeAround() {
   const [open, setOpen] = useState(null);
   const closeViewer = useCallback(() => setOpen(null), []);
   const navViewer = useCallback((d) => setOpen((i) => (i + d + slides.length) % slides.length), [slides.length]);
-  const credits = [...new Map(places.filter((p) => p.photo).map((p) => [PHOTO_CREDITS[p.photo][2] || PHOTO_CREDITS[p.photo][0], PHOTO_CREDITS[p.photo]])).values()];
+  const credits = [...new Map(all.filter((p) => p.photo).map((p) => [PHOTO_CREDITS[p.photo][2] || PHOTO_CREDITS[p.photo][0], PHOTO_CREDITS[p.photo]])).values()];
 
   return (
-    <div className="relative overflow-hidden bg-navy-950 py-20 text-white md:py-28">
+    <div ref={lifeRef} className="relative overflow-hidden bg-navy-950 py-20 text-white md:py-28">
       {/* faint survey grid */}
       <span
         aria-hidden="true"
@@ -192,9 +213,32 @@ function LifeAround() {
 
         <AnimatePresence>{open !== null && <Lightbox items={slides} index={open} onClose={closeViewer} onNav={navViewer} />}</AnimatePresence>
 
+        {/* group tabs (only when the project has many places) */}
+        {tabbed && (
+          <div role="tablist" aria-label="Type of place" className="mt-8 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center [&>*:first-child]:col-span-2">
+            {tabs.map(({ t, Icon, n }) => (
+              <button
+                key={t}
+                role="tab"
+                type="button"
+                aria-selected={t === tab}
+                onClick={() => setTab(t)}
+                className={cn(
+                  'flex items-center justify-center gap-2 rounded-full border px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.1em] transition-colors sm:px-4 sm:text-[12px] sm:tracking-[0.12em]',
+                  t === tab ? 'border-primary-300 bg-primary-400 text-navy-950 shadow-[0_8px_24px_-8px_rgba(232,192,106,0.7)]' : 'border-white/20 text-white/70 hover:border-primary-300/60 hover:text-white',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {t}
+                <span className={cn('rounded-full px-1.5 text-[10.5px]', t === tab ? 'bg-navy-950/15' : 'bg-white/10')}>{n}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* the residency in the middle, a vehicle heading out to every place */}
         {ORIGIN[slug] && (
-          <div className="mt-10">
+          <div className={tabbed ? 'mt-6' : 'mt-10'}>
             <RadialMap
               origin={ORIGIN[slug]}
               projectInfo={project}
@@ -233,7 +277,13 @@ function LifeAround() {
                 className="relative w-[72%] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/15 text-left shadow-[0_20px_40px_-20px_rgba(0,0,0,0.9)]"
               >
                 <span className="block aspect-[4/3] bg-navy-900">
-                  {p.photo && <img src={`/images/nearby/${p.photo}.webp`} alt={p.name} loading="lazy" className="h-full w-full object-cover" />}
+                  {p.photo ? (
+                    <img src={`/images/nearby/${p.photo}.webp`} alt={p.name} loading="lazy" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_25%,#2a6a58,#0e2f26_70%)] text-primary-300/80">
+                      {(() => { const I = (PLACE_TABS.find(([t]) => t === PLACE_TAB[p.cat]) || [])[1] || Building2; return <I className="h-14 w-14" strokeWidth={1.2} />; })()}
+                    </span>
+                  )}
                 </span>
                 <span className="absolute inset-0 bg-gradient-to-t from-[#04100c] via-[#04100c]/20 to-transparent" />
                 <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-3.5">
@@ -246,7 +296,7 @@ function LifeAround() {
         <p className="mt-2 text-center text-[11px] text-white/45 md:hidden">Swipe to see every place →</p>
 
         <div className="mt-6">
-          <NearbyShowcase places={places} />
+          <NearbyShowcase places={all} />
         </div>
 
         <p className="mt-8 text-[11px] leading-relaxed text-white/35">

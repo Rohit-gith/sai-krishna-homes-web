@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   CalendarCheck,
   CalendarPlus,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -21,6 +20,7 @@ import { useCrmStore } from '@/features/admin/store/useCrmStore';
 import { COMPANY } from '@/data/companyInfo';
 import { PROJECT_PAGES } from '@/data/projectPages';
 import logoImg from '@/assets/logo/logo.png';
+import { Namaste, PetalShower } from '@/features/welcome/Blessings';
 import { cn } from '@/utils/cn';
 
 /* ------------------------------------------------------------------ */
@@ -462,8 +462,13 @@ export default function SchedulerModal() {
 
               {step === 3 && (
                 <div className="py-4 text-center sm:py-8">
-                  <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600" strokeWidth={1.5} />
-                  <h3 className="mt-4 font-serif text-[1.9rem] leading-tight text-navy-950">Visit requested</h3>
+                  {/* namaste + marigold petals to thank the visitor */}
+                  <PetalShower count={28} />
+                  <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-navy-950">
+                    <Namaste className="h-12 w-12" />
+                  </span>
+                  <p className="mt-4 text-[12px] font-bold uppercase tracking-[0.3em] text-primary-700">Dhanyavaad</p>
+                  <h3 className="mt-1 font-serif text-[1.9rem] leading-tight text-navy-950">We look forward to welcoming you</h3>
                   <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-slate-600">
                     {proj.name} · {when}. Send the WhatsApp message and our team will confirm your slot shortly.
                   </p>

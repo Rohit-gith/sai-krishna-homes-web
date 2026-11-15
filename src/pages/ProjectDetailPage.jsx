@@ -16,6 +16,7 @@ import ProjectFaq from '@/features/projects/ProjectFaq';
 import PricingSection from '@/features/projects/PricingSection';
 import InteractivePlan from '@/features/projects/InteractivePlan';
 import WalkthroughSection from '@/features/projects/WalkthroughSection';
+import FacilityStrip from '@/features/projects/FacilityStrip';
 import { PROJECT_PAGES, projectPath } from '@/data/projectPages';
 import { responsive } from '@/data/projects';
 import { COMPANY } from '@/data/companyInfo';
@@ -32,7 +33,6 @@ const sectionsFor = (p) =>
     p.tours.length ? ['virtual-tour', '360° Tour'] : null,
     ['amenities', 'Amenities'],
     ['specifications', 'Specifications'],
-    ['emi', 'EMI'],
     ['location', 'Location'],
     ['faq', 'FAQ'],
     ['contact', 'Contact'],
@@ -156,6 +156,13 @@ function Hero({ p, onBrochure }) {
             </button>
           </div>
         </motion.div>
+
+        {/* every facility visible at once, a gold highlight walking through them */}
+        <FacilityStrip
+          className="mt-10"
+          label={p.usps?.length ? 'Highlights' : 'Facilities'}
+          items={[...(p.usps || []), ...(p.facilities?.length ? p.facilities : p.amenities.map(([n]) => n).filter((n) => !/elevation/i.test(n)))]}
+        />
 
         <dl className="mt-12 grid grid-cols-2 border-t border-white/15 md:grid-cols-4">
           {p.stats.map(([v, l], i) => (

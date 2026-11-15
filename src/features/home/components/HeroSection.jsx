@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useId, useRef, useState } from 'react';
+import { AnimatePresence, motion, useInView } from 'framer-motion';
 import { ArrowRight, BadgeCheck, CalendarCheck, Leaf, MapPin, Star, Wallet } from 'lucide-react';
 import { LANDMARKS, PRICE_CHECK, STARTING_FROM } from '@/data/comparison';
 import { PROJECT_PAGES } from '@/data/projectPages';
@@ -55,29 +55,72 @@ const CONFIGS = ['1 BHK', '2 BHK', '3 BHK'];
 const pw = LANDMARKS['panchawati-residency'];
 const mins = (name) => pw.find((p) => p.name.startsWith(name))?.mins;
 const belowPct = Math.round(((PRICE_CHECK.market.rate - PRICE_CHECK.ours.avg) / PRICE_CHECK.market.rate) * 100);
+const priceL = `₹${(STARTING_FROM / 1e5).toFixed(2).replace(/.?0+$/, '')} L`;
+/** Google "G" mark, used only to attribute the Google rating. */
+function GoogleG({ className }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z" />
+    </svg>
+  );
+}
+
+/** Highlighter-pen swipe behind a few words (transform only). */
+function Marker({ children }) {
+  return (
+    <span className="relative inline-block whitespace-nowrap px-1 font-semibold text-navy-950">
+      <motion.span
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 top-[30%] origin-left rounded-[3px] bg-amber-300/80 will-change-transform"
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: 0.7, delay: 1.8, ease: [0.22, 1, 0.36, 1] }}
+      />
+      <span className="relative">{children}</span>
+    </span>
+  );
+}
+
+// Hero selling points as stat tiles: a big number up top, the proof under it.
+// Phones get a compact 3-in-a-row version (mUnit / mDetail) so the CTA stays near the top.
 const SELLING = [
   {
     icon: Wallet,
     kicker: 'Affordable',
-    title: `Homes from ₹${(STARTING_FROM / 1e5).toFixed(2).replace(/.?0+$/, '')} L`,
-    short: `from ₹${(STARTING_FROM / 1e5).toFixed(2).replace(/.?0+$/, '')} L, ${belowPct}% below the ${PRICE_CHECK.market.area} average`,
-    proof: `Panchawati is ${belowPct}% below the ${PRICE_CHECK.market.area} average rate, with a pool, gym and 20 amenities.`,
+    tone: 'gold',
+    stat: priceL,
+    unit: 'onwards',
+    detail: <Marker>{belowPct}% below {PRICE_CHECK.market.area} avg</Marker>,
+    mDetail: (<><Marker>{belowPct}% below</Marker> <span className="whitespace-nowrap">{PRICE_CHECK.market.area} avg</span></>),
   },
   {
     icon: MapPin,
     kicker: 'Close by',
-    title: `Patia station ${mins('Patia')} min · KIIT Square ${mins('KIIT')} min`,
-    short: `from Panchawati, Patia station just ${mins('Patia')} min, KIIT Square ${mins('KIIT')} min, Esplanade One ${mins('Esplanade')} min`,
-    proof: `From Panchawati by road: Esplanade One ${mins('Esplanade')} min, airport ${mins('Biju')} min.`,
+    tone: 'navy',
+    stat: `${mins('Patia')} min`,
+    unit: 'to Patia station',
+    mUnit: 'Patia station',
+    detail: `KIIT Sq ${mins('KIIT')} · Esplanade ${mins('Esplanade')} min, from Panchawati`,
   },
   {
     icon: Leaf,
     kicker: 'Green living',
-    title: 'Solar · Rainwater · STP · EV',
-    short: 'lush green surroundings, 74 new trees, solar, rainwater harvesting, STP and EV charging at Panchawati',
-    proof: 'At Panchawati: rooftop solar, rainwater harvesting, sewage treatment, EV charging and 74 trees planned (RERA).',
+    mKicker: 'Green',
+    tone: 'green',
+    stat: '74',
+    unit: 'new trees',
+    detail: 'Solar · Rainwater · STP · EV charging',
+    mDetail: 'Solar, STP, EV',
   },
 ];
+const TONE = {
+  gold: { tile: 'bg-gradient-to-br from-primary-100 via-white/90 to-white/70 ring-primary-300/80', chip: 'bg-primary-500 text-white', kicker: 'text-primary-700', stat: 'text-primary-700' },
+  navy: { tile: 'bg-white/75 ring-white', chip: 'bg-navy-900 text-primary-200', kicker: 'text-navy-700', stat: 'text-navy-950' },
+  green: { tile: 'bg-gradient-to-br from-emerald-50 via-white/90 to-white/70 ring-emerald-200', chip: 'bg-emerald-600 text-white', kicker: 'text-emerald-700', stat: 'text-emerald-800' },
+};
 
 const RERA = PROJECT_PAGES.map((p) => ({ name: p.name, rera: p.rera, url: p.reraUrl }));
 
@@ -256,17 +299,21 @@ export default function HeroSection() {
   const night = useThemeStore((s) => s.night);
   const SLIDES = night ? NIGHT_SLIDES : DAY_SLIDES;
   const [active, setActive] = useState(0);
+  // The slideshow only runs while the hero is on screen (saves the CPU while the visitor scrolls).
+  const heroRef = useRef(null);
+  const heroInView = useInView(heroRef, { margin: '0px' });
 
   // Restart the slideshow from the first photo when the view switches.
   useEffect(() => setActive(0), [night]);
 
   useEffect(() => {
+    if (!heroInView) return undefined;
     const t = setTimeout(() => setActive((i) => (i + 1) % SLIDES.length), SLIDE_MS);
     return () => clearTimeout(t);
-  }, [active, SLIDES.length]);
+  }, [active, SLIDES.length, heroInView]);
 
   return (
-    <section className="relative isolate overflow-x-clip bg-ivory pb-16 md:pb-20">
+    <section ref={heroRef} className="relative isolate overflow-x-clip bg-ivory pb-16 md:pb-20">
       {/* Full-bleed photo slideshow: no dark overlay, the building stays bright */}
       <div className="relative mt-16 h-[58svh] overflow-hidden md:mt-[5.75rem] lg:absolute lg:inset-x-0 lg:top-0 lg:mt-0 lg:h-[calc(100%-9rem)]">
         <AnimatePresence initial={false}>
@@ -297,7 +344,7 @@ export default function HeroSection() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1, delay: 0.15, ease }}
-              className="bg-ivory/92 relative -mt-28 rounded-[2rem] border border-white/70 p-7 shadow-[0_40px_90px_-35px_rgba(8,38,32,0.5)] backdrop-blur-xl sm:p-10 lg:mt-0"
+              className="relative -mt-28 min-w-0 rounded-[2rem] border border-white/70 bg-ivory/55 p-5 shadow-[0_40px_90px_-35px_rgba(8,38,32,0.5)] backdrop-blur-2xl backdrop-brightness-110 backdrop-saturate-50 sm:p-10 lg:mt-0"
             >
               <div className="absolute -right-2 -top-10 sm:-right-10 sm:-top-12">
                 <Seal />
@@ -322,30 +369,27 @@ export default function HeroSection() {
 
               <motion.p
                 {...rise(0.8)}
-                className="mt-5 text-[1.05rem] leading-[1.75] text-slate-600"
+                className="mt-4 text-[1.05rem] leading-[1.65] text-slate-600"
               >
-                1, 2 &amp; 3 BHK homes in Patia and South Bhubaneswar, with every approval in place.
+                One of the most affordable addresses in Patia &amp; South Bhubaneswar: <span className="whitespace-nowrap">1, 2 &amp; 3 BHK</span> homes with every
+                approval in place.{' '}
+                <a
+                  href={`https://wa.me/${COMPANY.whatsapp}?text=${encodeURIComponent('Hi Sai Krishna Homes, please share the latest price list for your 1, 2 & 3 BHK homes.')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group font-semibold text-primary-700 underline decoration-primary-300 decoration-2 underline-offset-4 transition-colors hover:text-navy-900 hover:decoration-primary-500"
+                >
+                  {/* flows right after the sentence; only "WhatsApp →" is kept together */}
+                  Get price list on{' '}
+                  <span className="whitespace-nowrap">
+                    WhatsApp
+                    <ArrowRight className="ml-1 inline h-4 w-4 align-[-2px] transition-transform group-hover:translate-x-1" />
+                  </span>
+                </a>
               </motion.p>
 
-              <motion.ul {...rise(0.85)} className="mt-6 space-y-2.5">
-                {SELLING.map(({ icon: Icon, kicker, short }, i) => (
-                  <li key={kicker} className="flex items-center gap-3 text-[14.5px] leading-snug text-navy-950">
-                    <span
-                      className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-                        i === 2 ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-white text-primary-700 ring-1 ring-primary-200',
-                      )}
-                    >
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span>
-                      <span className={cn('font-semibold', i === 2 ? 'text-emerald-800' : 'text-navy-950')}>{kicker}:</span> {short}
-                    </span>
-                  </li>
-                ))}
-              </motion.ul>
-
-              <motion.div {...rise(0.9)} className="mt-7 flex flex-col gap-3 sm:flex-row">
+              {/* the main action sits right under the promise, so it is on screen without scrolling */}
+              <motion.div {...rise(0.85)} className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <Magnetic>
                   <a
                     href="#book-visit"
@@ -357,6 +401,41 @@ export default function HeroSection() {
                 </Magnetic>
               </motion.div>
 
+              <motion.ul {...rise(0.9)} className="mt-6 grid grid-cols-3 gap-2 sm:gap-2.5">
+                {SELLING.map(({ icon: Icon, kicker, mKicker, tone, stat, unit, mUnit, detail, mDetail }, i) => {
+                  const t = TONE[tone];
+                  return (
+                    <motion.li
+                      key={kicker}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6, delay: 1 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+                      className={cn(
+                        'group min-w-0 rounded-xl p-2 shadow-[0_10px_30px_-18px_rgba(8,38,32,0.45)] ring-1 transition-transform duration-300 hover:-translate-y-1 sm:rounded-2xl sm:p-4',
+                        t.tile,
+                      )}
+                    >
+                      <div className="mb-1.5 flex items-center gap-2 sm:mb-2.5">
+                        <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-md shadow-sm sm:h-7 sm:w-7 sm:rounded-lg', t.chip)}>
+                          <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        </span>
+                        <span className={cn('hidden text-[10.5px] font-bold uppercase tracking-[0.16em] sm:inline', t.kicker)}>{kicker}</span>
+                      </div>
+                      <span className={cn('block truncate text-[8.5px] font-bold uppercase tracking-[0.12em] sm:hidden', t.kicker)}>{mKicker || kicker}</span>
+                      <p className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 leading-none sm:gap-y-1.5">
+                        <span className={cn('whitespace-nowrap font-serif text-[17px] font-semibold tracking-tight min-[380px]:text-[19px] sm:text-[28px]', t.stat)}>{stat}</span>
+                        <span className="text-[10.5px] font-medium leading-tight text-navy-900/75 sm:text-[12.5px]">
+                          <span className="sm:hidden">{mUnit || unit}</span>
+                          <span className="hidden sm:inline">{unit}</span>
+                        </span>
+                      </p>
+                      <p className="mt-1 text-[10px] leading-snug text-navy-900/70 sm:hidden">{mDetail}</p>
+                      <p className="mt-1.5 hidden text-[12px] leading-snug text-navy-900/70 sm:block">{detail}</p>
+                    </motion.li>
+                  );
+                })}
+              </motion.ul>
+
               <motion.div
                 {...rise(1)}
                 className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-3"
@@ -366,16 +445,26 @@ export default function HeroSection() {
                   target="_blank"
                   rel="noreferrer"
                   title={`${GOOGLE.name} on Google Maps: read the reviews`}
-                  className="flex w-full items-center gap-2 text-[13px] text-navy-900 hover:text-primary-700 lg:hidden"
+                  className="flex w-full items-center gap-3 rounded-2xl bg-white px-3.5 py-3 shadow-[0_10px_30px_-16px_rgba(8,38,32,0.45)] ring-1 ring-slate-200/80 transition-shadow active:shadow-sm lg:hidden"
                 >
-                  <span className="flex text-primary-500">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className={cn('h-4 w-4', i < Math.round(GOOGLE.rating) ? 'fill-current' : '')} />
-                    ))}
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200">
+                    <GoogleG className="h-5 w-5" />
                   </span>
-                  <span className="font-serif text-[1.15rem] font-semibold">{GOOGLE.rating}</span>
-                  <span className="font-medium text-navy-900">
-                    on Google · {GOOGLE.reviews} reviews of {GOOGLE.name} ↗
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="font-serif text-[1.35rem] font-semibold leading-none text-navy-950">{GOOGLE.rating}</span>
+                      <span className="flex text-amber-400">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} className={cn('h-3.5 w-3.5', i < Math.round(GOOGLE.rating) ? 'fill-current' : '')} />
+                        ))}
+                      </span>
+                    </span>
+                    <span className="mt-1 block truncate text-[11.5px] text-slate-500">
+                      {GOOGLE.reviews} Google reviews · {GOOGLE.name}
+                    </span>
+                  </span>
+                  <span className="shrink-0 rounded-full bg-navy-900 px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.1em] text-white">
+                    Read ↗
                   </span>
                 </a>
                 <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.16em] text-navy-900">
@@ -456,7 +545,7 @@ export default function HeroSection() {
                       </span>
                       <span className="block truncate text-[11px] text-slate-500">{s.caption}</span>
                       <span className="mt-1.5 block h-0.5 overflow-hidden rounded-full bg-navy-100">
-                        {active === i && (
+                        {active === i && heroInView && (
                           <motion.span
                             key={`bar-${active}`}
                             className="block h-full rounded-full bg-primary-500"

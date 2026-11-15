@@ -1,4 +1,4 @@
-import { Building2, GraduationCap, Hospital, ShoppingBag, TrainFront } from 'lucide-react';
+import { Building2, GraduationCap, Hospital, ShieldCheck, ShoppingBag, TrainFront } from 'lucide-react';
 
 /* Facilities grouped the way a home buyer thinks about them. */
 const GROUP = {
@@ -13,9 +13,10 @@ const GROUP = {
   Railway: 'Travel',
   Airport: 'Travel',
   Bus: 'Travel',
+  Police: 'Safety',
 };
-const GROUP_ICON = { Healthcare: Hospital, Education: GraduationCap, Shopping: ShoppingBag, Work: Building2, Travel: TrainFront };
-const GROUP_ORDER = ['Healthcare', 'Education', 'Shopping', 'Travel', 'Work'];
+const GROUP_ICON = { Healthcare: Hospital, Education: GraduationCap, Shopping: ShoppingBag, Work: Building2, Travel: TrainFront, Safety: ShieldCheck };
+const GROUP_ORDER = ['Healthcare', 'Education', 'Shopping', 'Travel', 'Work', 'Safety'];
 
 /**
  * "Life around you": the residency and the big facilities around it, as a photo showcase.
@@ -35,7 +36,7 @@ export default function NearbyShowcase({ places }) {
   return (
     <div>
       {/* summary band */}
-      <ul className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-3 lg:grid-cols-5">
+      <ul className={`grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-3 ${groups.length > 5 ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
         {groups.map(({ g, count, nearest }) => {
           const Icon = GROUP_ICON[g];
           return (

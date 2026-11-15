@@ -131,13 +131,27 @@ export const PHOTO_CREDITS = {
   // Photo supplied by the project team (13 Nov 2026).
   retang: ['Retang station photo', 'courtesy', null],
   infosys: ['rajagopal_rajeev', 'CC BY 2.0', 'https://www.flickr.com/photos/25185529@N00/7854968142'],
+  // Photos supplied by the project team (15 Nov 2026).
+  'st-xavier': ["St. Xavier's High School photo", 'courtesy', null],
+  gita: ['GITA Autonomous College photo', 'courtesy', null],
+  soa: ['SOA University photo', 'courtesy', null],
+  'sum-hospital': ['SUM Hospital photo', 'courtesy', null],
+  igkc: ['IGKC Multispecialty Hospital photo', 'courtesy', null],
+  'sum-ultimate': ['SUM Ultimate Medicare photo', 'courtesy', null],
+  'tamando-ps': ['Tamando Police Station photo', 'courtesy', null],
+  'kiit-intl': ['KIIT International School photo', 'courtesy', null],
+  'st-xavier-intl': ['St. Xavier International School photo', 'courtesy', null],
+  'infocity-ps': ['Infocity Police Station photo', 'courtesy', null],
+  'narayana-patia': ['Narayana School, Patia photo', 'courtesy', null],
+  cvrgu: ['Whitecirius', 'CC BY-SA 3.0', 'https://commons.wikimedia.org/wiki/File:Cvrce_campus.jpg'],
+  outr: ['Teupdeg', 'CC BY-SA 4.0', 'https://commons.wikimedia.org/wiki/File:CETB_Main_Office_Building.jpg'],
 };
 
 /**
  * One nearby place. km = road distance in km (number) when known; time = drive time text when only
  * that is published; photo = key into /images/nearby; q = Google Maps search text for the live route.
  */
-const L = (name, cat, { km = null, mins = null, time = null, q = null, photo = null, at = null } = {}) => ({ name, cat, km, mins, time, q, photo, at });
+const L = (name, cat, { km = null, mins = null, time = null, q = null, photo = null, at = null, added = false } = {}) => ({ name, cat, km, mins, time, q, photo, at, added });
 
 /**
  * Panchawati: road distances from Google Maps (fastest driving route from the project's own Google
@@ -169,6 +183,11 @@ export const LANDMARKS = {
     L('Utkal Hospital', 'Hospital', { km: 8.5, mins: 22, at: [20.3225785, 85.8004278], q: 'Utkal Hospital, Bhubaneswar', photo: 'utkal' }),
     L('Apollo Hospitals', 'Hospital', { km: 10, mins: 27, at: [20.3063554, 85.832169], q: 'Apollo Hospitals, Sainik School Road, Bhubaneswar', photo: 'apollo' }),
     L('Biju Patnaik International Airport', 'Airport', { km: 14.5, mins: 37, at: [20.2506821, 85.8145388], q: 'Biju Patnaik International Airport, Bhubaneswar', photo: 'airport' }),
+    // Added 15 Nov 2026 at the client's request (Google Maps, fastest driving route from the listing).
+    L('St. Xavier International School', 'School', { added: true, km: 3.4, mins: 11, at: [20.3479717, 85.8250277], q: 'St. Xavier International School, Bhubaneswar', photo: 'st-xavier-intl' }),
+    L('KIIT International School', 'School', { added: true, km: 3.8, mins: 13, at: [20.3533303, 85.8109407], q: 'KIIT International School, Patia, Bhubaneswar', photo: 'kiit-intl' }),
+    L('Infocity Police Station', 'Police', { added: true, km: 4, mins: 13, at: [20.3545375, 85.8091245], q: 'Infocity Police Station, Patia, Bhubaneswar', photo: 'infocity-ps' }),
+    L('Narayana School, Patia', 'School', { added: true, km: 5.3, mins: 16, at: [20.3411213, 85.8158035], q: 'Narayana Schools - Patia, Bhubaneswar', photo: 'narayana-patia' }),
   ],
   'sai-krishna-residency': [
     // mins + at: Google Maps, fastest driving route from Sai Krishna Residency's Google listing
@@ -181,6 +200,16 @@ export const LANDMARKS = {
     L('Reserve Bank of India', 'RBI', { km: 21, mins: 36, at: [20.2743478, 85.8346241], q: 'RBI Bhubaneswar', photo: 'rbi' }),
     L('Biju Patnaik International Airport', 'Airport', { km: 20.7, mins: 37, at: [20.2506821, 85.8145388], q: 'Biju Patnaik International Airport, Bhubaneswar', photo: 'airport' }),
     L('IIT Bhubaneswar', 'Institute', { km: 16.2, mins: 37, at: [20.1483345, 85.6712472], q: 'IIT Bhubaneswar, Argul', photo: 'iit' }),
+    // Added 15 Nov 2026 at the client's request; same source (Google Maps, fastest driving route from the listing).
+    L("St. Xavier's High School", 'School', { added: true, km: 1.1, mins: 3, at: [20.2116703, 85.7359494], q: "St Xavier's High School, Mahura", photo: 'st-xavier' }),
+    L('C. V. Raman Global University', 'College', { added: true, km: 2.6, mins: 9, at: [20.2210473, 85.7360397], q: 'C. V. Raman Global University, Bhubaneswar', photo: 'cvrgu' }),
+    L('Tamando Police Station', 'Police', { added: true, km: 8.2, mins: 16, at: [20.2356169, 85.745673], q: 'Tamando Police Station, Bhubaneswar', photo: 'tamando-ps' }),
+    L('GITA Autonomous College', 'College', { added: true, km: 8.2, mins: 20, at: [20.2381966, 85.7225714], q: 'GITA Autonomous College, Bhubaneswar', photo: 'gita' }),
+    L('SOA University', 'College', { added: true, km: 14.1, mins: 23, at: [20.2589969, 85.7919803], q: "Siksha 'O' Anusandhan University, Bhubaneswar", photo: 'soa' }),
+    L('IGKC Multispecialty Hospital', 'Hospital', { added: true, km: 13.8, mins: 28, at: [20.2739911, 85.7642268], q: 'IGKC Multispecialty Hospital, Ghatikia, Bhubaneswar', photo: 'igkc' }),
+    L('OUTR University', 'College', { added: true, km: 15.3, mins: 32, at: [20.275845, 85.776639], q: 'Odisha University of Technology and Research, Bhubaneswar', photo: 'outr' }),
+    L('SUM Hospital', 'Hospital', { added: true, km: 15.6, mins: 32, at: [20.2833726, 85.7691526], q: 'SUM Hospital, Kalinga Nagar, Bhubaneswar', photo: 'sum-hospital' }),
+    L('SUM Ultimate Medicare', 'Hospital', { added: true, km: 15.8, mins: 33, at: [20.2830483, 85.7725506], q: 'SUM Ultimate Medicare, Kalinga Nagar, Bhubaneswar', photo: 'sum-ultimate' }),
   ],
 };
 

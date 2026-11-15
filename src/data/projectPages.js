@@ -31,7 +31,7 @@ export const PROJECT_PAGES = [
     name: 'Sai Krishna Residency',
     status: 'Current project',
     tagline: 'Premium Residential Living',
-    headline: 'Largest Township Project Of South Bhubaneswar Near Infosys 2',
+    headline: 'Best Affordable Homes in the Largest Township of South Bhubaneswar, Near Infosys 2',
     location: 'South Bhubaneswar · Near Cuttack–Bhubaneswar Bypass',
     rera: 'MP/19/2024/01126',
     // Official Odisha RERA page. Checked 13 Nov 2026: 497 units, S+6 + market complex, possession 1 May 2028.
@@ -41,7 +41,7 @@ export const PROJECT_PAGES = [
     hero: img('skr/banner-night', 'Sai Krishna Residency township at night'),
     card: img('skr/banner-night', 'Sai Krishna Residency township at night'),
     stats: [
-      ['500+', 'Flats'],
+      ['600+', 'Flats'],
       ['~6', 'Acres of land'],
       ['900+', 'Parking spaces'],
       ['25+', 'Amenities at the Sports Arena'],
@@ -115,6 +115,8 @@ export const PROJECT_PAGES = [
       ['Temple & Market Complex', img('skr/temple-market', 'Temple and market complex')],
       ['24/7 Gated Security', img('pw/a-security', 'Gated security')],
     ],
+    // client-supplied USPs (Nov 2026); shown first in the hero highlights strip
+    usps: ['Vast Open Area', 'Extremely Low-Density Township', 'Well-Maintained Society', 'Young & Educated Community', 'Dedicated Temple in the Township', 'Close to All People-Centric Places'],
     facilities: ['24 Hrs Water Supply', 'Double Lift Each Block', 'Car Parking Facilities', 'Power Backup Generator', 'High Rise Compound Wall', 'Bore Wells Water Supply'],
     specs: [
       ['Structure', [

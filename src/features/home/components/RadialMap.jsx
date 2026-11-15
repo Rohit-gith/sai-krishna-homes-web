@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useReducedMotion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useInView, useReducedMotion } from 'framer-motion';
 import {
   Building2,
   Bus,
@@ -9,12 +9,13 @@ import {
   Navigation,
   Plane,
   School,
+  ShieldCheck,
   ShoppingBag,
   TrainFront,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
-const ICONS = { Airport: Plane, Railway: TrainFront, College: GraduationCap, Institute: GraduationCap, School, Hospital, RBI: Landmark, 'IT hub': Building2, Mall: ShoppingBag, Bus };
+const ICONS = { Airport: Plane, Railway: TrainFront, College: GraduationCap, Institute: GraduationCap, School, Hospital, RBI: Landmark, 'IT hub': Building2, Mall: ShoppingBag, Bus, Police: ShieldCheck };
 
 /* Stage (SVG units) */
 const W = 1200;
@@ -54,7 +55,7 @@ function spread(items, gap) {
 }
 const xy = (b, r) => [CX + RX * r * Math.sin(b * rad), CY - RY * r * Math.cos(b * rad)];
 
-function Vehicle({ m }) {
+function VehicleShape({ m }) {
   if (m === 'air')
     return <path transform="scale(1.4)" d="M16 0 L-4 -2.4 L-10 -13 L-14 -13 L-9.5 -2 L-13.5 -1.6 L-16.5 -6 L-19 -6 L-17 0 L-19 6 L-16.5 6 L-13.5 1.6 L-9.5 2 L-14 13 L-10 13 L-4 2.4 Z" fill="#FFE7AE" stroke="#0b2a22" strokeWidth="1" />;
   if (m === 'rail')
@@ -73,6 +74,15 @@ function Vehicle({ m }) {
   );
 }
 
+/** A vehicle as its own tiny SVG, pointing right (+x). */
+function Vehicle({ m }) {
+  return (
+    <svg viewBox="-34 -20 56 40" className="block h-[18px] w-[26px] sm:h-[24px] sm:w-[34px]" aria-hidden="true">
+      <VehicleShape m={m} />
+    </svg>
+  );
+}
+
 /**
  * Location diagram: the residency in the centre, each facility as a labelled photo card in its
  * real compass direction (spaced so nothing overlaps), nearer = closer to the centre, and a
@@ -80,6 +90,15 @@ function Vehicle({ m }) {
  */
 export default function RadialMap({ origin, projectInfo, places, activeName, onPick }) {
   const reduce = useReducedMotion();
+  const wrap = useRef(null);
+  const inView = useInView(wrap, { margin: '100px 0px' });
+  const [box, setBox] = useState({ w: 1200, h: 760 });
+  useEffect(() => {
+    if (!wrap.current) return undefined;
+    const ro = new ResizeObserver(([e]) => setBox({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(wrap.current);
+    return () => ro.disconnect();
+  }, []);
   const items = useMemo(() => {
     const list = places.filter((p) => p.mins != null);
     const maxM = Math.max(...list.map((p) => p.mins));
@@ -90,15 +109,16 @@ export default function RadialMap({ origin, projectInfo, places, activeName, onP
       b: origin && p.at ? bearing(origin, p.at) : (360 / list.length) * i,
       r: 0.62 + 0.38 * Math.sqrt(p.mins / maxM),
     }));
-    return spread(withB, 360 / list.length).map((p) => {
+    // only push cards apart as much as needed to stop overlap (~40°), so each stays near its real direction
+    return spread(withB, Math.min(360 / list.length, 40)).map((p) => {
       const [x, y] = xy(p.b, p.r);
-      const d = p.m === 'air' ? `M${CX} ${CY} Q${(CX + x) / 2 + 60} ${(CY + y) / 2 - 60} ${x} ${y}` : `M${CX} ${CY} L${x} ${y}`;
+      const d = `M${CX} ${CY} L${x} ${y}`;
       return { ...p, x, y, d };
     });
   }, [places, origin]);
 
   return (
-    <div className="relative mx-auto w-full" style={{ aspectRatio: `${W} / ${H}` }}>
+    <div ref={wrap} className="relative mx-auto w-full" style={{ aspectRatio: `${W} / ${H}` }}>
       <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full" aria-hidden="true">
         <defs>
           <radialGradient id="rm-plate" cx="50%" cy="45%" r="60%">
@@ -138,16 +158,32 @@ export default function RadialMap({ origin, projectInfo, places, activeName, onP
             />
           );
         })}
-        {!reduce &&
-          items.map((p) => (
-            <g key={`v-${p.name}`}>
-              <Vehicle m={p.m} />
-              <animateMotion dur={`${3.2 + p.mins / 14}s`} begin={`${(p.i * 0.6) % 4}s`} repeatCount="indefinite" rotate="auto" calcMode="spline" keyTimes="0;1" keyPoints="0;1" keySplines="0.45 0 0.25 1">
-                <mpath href={`#rm-${p.i}`} />
-              </animateMotion>
-            </g>
-          ))}
       </svg>
+
+      {/* vehicles: each runs on its own layer with a transform-only CSS animation (no SVG repaint),
+          and everything pauses while the map is off screen */}
+      {!reduce && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ animationPlayState: inView ? 'running' : 'paused' }}>
+          {items.map((p) => {
+            const dx = ((p.x - CX) / W) * box.w;
+            const dy = ((p.y - CY) / H) * box.h;
+            const len = Math.hypot(dx, dy);
+            const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
+            return (
+              <div key={`v-${p.name}`} className="absolute" style={{ left: `${(CX / W) * 100}%`, top: `${(CY / H) * 100}%`, width: len, height: 0, transform: `rotate(${ang}deg)`, transformOrigin: '0 0' }}>
+                <div
+                  className="rm-drive absolute left-0 top-0 h-0 w-full"
+                  style={{ animationDuration: `${3.2 + p.mins / 14}s`, animationDelay: `${-((p.i * 0.9) % 4)}s`, animationPlayState: inView ? 'running' : 'paused' }}
+                >
+                  <span className="absolute right-0 top-0 -translate-y-1/2 translate-x-1/2">
+                    <Vehicle m={p.m} />
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* place cards: photo + name + time, always visible */}
       {items.map((p) => {
@@ -165,13 +201,20 @@ export default function RadialMap({ origin, projectInfo, places, activeName, onP
           >
             <span className={cn('flex w-[2.6rem] flex-col items-center overflow-hidden rounded-full border bg-[#0b221b] shadow-[0_16px_30px_-12px_rgba(0,0,0,0.9)] sm:w-[7rem] sm:rounded-xl lg:w-[8.5rem]', on ? 'border-primary-300 ring-4 ring-primary-400/30' : 'border-white/25')}>
               <span className="relative block aspect-square w-full bg-navy-900 sm:aspect-[4/3]">
-                {p.photo ? <img src={`/images/nearby/${p.photo}.webp`} alt="" loading="lazy" className="h-full w-full object-cover" /> : null}
+                {p.photo ? (
+                  <img src={`/images/nearby/${p.photo}.webp`} alt="" loading="lazy" className="h-full w-full object-cover" />
+                ) : (
+                  // no photo yet: a clean category tile instead of an empty box
+                  <span className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_25%,#2a6a58,#0e2f26_70%)]">
+                    <Icon className="h-4 w-4 text-primary-300 sm:h-9 sm:w-9" strokeWidth={1.4} />
+                  </span>
+                )}
                 <span className="absolute left-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-black/55 text-primary-200 sm:flex sm:h-6 sm:w-6">
                   <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 </span>
               </span>
               <span className="hidden w-full px-2 py-1.5 text-center sm:block">
-                <span className="hidden truncate text-[11.5px] font-semibold leading-tight text-white sm:block lg:text-[12.5px]">{p.name}</span>
+                <span className="hidden text-[11.5px] font-semibold leading-tight text-white line-clamp-2 sm:[display:-webkit-box] lg:text-[12.5px]">{p.name}</span>
                 <span className={cn('block text-[10px] font-bold sm:text-[11.5px]', on ? 'text-primary-200' : 'text-primary-300')}>Just {p.mins} min</span>
               </span>
             </span>
@@ -185,7 +228,7 @@ export default function RadialMap({ origin, projectInfo, places, activeName, onP
       {/* the residency */}
       <div className="pointer-events-none absolute z-[4] -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${(CX / W) * 100}%`, top: `${(CY / H) * 100}%` }}>
         <span className="relative mx-auto block h-14 w-14 sm:h-32 sm:w-32 lg:h-40 lg:w-40">
-          {!reduce && <span className="absolute inset-0 animate-ping rounded-full bg-primary-400/25 [animation-duration:2.8s]" />}
+          {!reduce && inView && <span className="absolute inset-0 animate-ping rounded-full bg-primary-400/25 [animation-duration:2.8s]" />}
           <span className="absolute -inset-2 rounded-full border border-primary-300/40" />
           <span className="relative block h-full w-full overflow-hidden rounded-full border-4 border-primary-300 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.9)]">
             <img src={projectInfo.photo} alt={projectInfo.name} className="h-full w-full object-cover" />

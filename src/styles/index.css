@@ -312,3 +312,12 @@ html.night iframe { filter: grayscale(0.5) brightness(0.8) contrast(1.1); }
 html.night .fill-navy-900 { fill: #f2ede2; }
 /* Playfair has no ₹ glyph: draw the rupee sign in the UI font everywhere it appears in serif numbers. */
 .rupee { font-family: 'Manrope', system-ui, sans-serif; font-weight: 600; margin-right: 0.04em; }
+
+/* RadialMap vehicles: transform + opacity only, so they run on the compositor */
+@keyframes rm-drive {
+  0% { transform: translateX(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateX(0); opacity: 0; }
+}
+.rm-drive { animation: rm-drive 4s cubic-bezier(0.45, 0, 0.25, 1) infinite; will-change: transform, opacity; }
