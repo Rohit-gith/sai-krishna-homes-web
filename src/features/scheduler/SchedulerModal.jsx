@@ -27,7 +27,7 @@ import { cn } from '@/utils/cn';
 /* Settings: change visit hours / length here                          */
 /* ------------------------------------------------------------------ */
 const VISIT_MINUTES = 45;
-const FIRST_SLOT = 10 * 60; // 10:00 AM
+const FIRST_SLOT = 8 * 60; // 8:00 AM (client asked for early-morning visits)
 const LAST_SLOT = 17 * 60; // 5:00 PM (visit ends by 5:45 PM)
 const SLOT_STEP = 30;
 const MIN_NOTICE_MIN = 120; // a slot must start at least 2 hours from now
