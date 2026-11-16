@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion';
 import { Home } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -30,6 +30,21 @@ export function JourneyRail({ stops }) {
     return 4 + t * Math.max(0, w - 30);
   });
   const [active, setActive] = useState(0);
+  // phones: the section name hangs under the house for a moment each time a new section starts.
+  // The pill's own shift runs 0 → -100% with progress, so it never runs off either screen edge.
+  const houseCentre = useTransform(mobileX, (x) => x + 11);
+  const pillShift = useTransform(p, (v) => `${-Math.min(1, Math.max(0, v)) * 100}%`);
+  const [flash, setFlash] = useState(false);
+  const seen = useRef(false);
+  useEffect(() => {
+    if (!seen.current) {
+      seen.current = true; // not on page load, only when the visitor reaches a new section
+      return undefined;
+    }
+    setFlash(true);
+    const t = setTimeout(() => setFlash(false), 1800);
+    return () => clearTimeout(t);
+  }, [active]);
 
   // which stop is in view: section tops are measured once (and on resize / late image loads),
   // then each scroll just compares numbers, so scrolling never forces a layout
@@ -73,6 +88,24 @@ export function JourneyRail({ stops }) {
         >
           <Home className="h-3 w-3" />
         </motion.span>
+        <motion.div className="absolute left-0 top-[18px]" style={{ x: houseCentre }}>
+          <AnimatePresence mode="wait">
+            {flash && stops[active] && (
+              <motion.span
+                key={stops[active].id}
+                role="status"
+                className="block whitespace-nowrap rounded-full bg-navy-900 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary-200 shadow-[0_6px_16px_-6px_rgba(8,38,32,0.6)] ring-1 ring-primary-400/60"
+                style={{ x: pillShift }}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.25 }}
+              >
+                {stops[active].label}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
 
       {/* desktop: the rail */}
