@@ -470,7 +470,8 @@ export default function HeroSection() {
                 <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.16em] text-navy-900">
                   <BadgeCheck className="h-5 w-5 text-primary-600" /> RERA registered
                 </span>
-                <span className="flex flex-wrap gap-2">
+                {/* mobile: the two records side by side in equal columns; wider screens: natural width */}
+                <span className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   {RERA.map((r) => (
                     <a
                       key={r.rera}
@@ -479,10 +480,10 @@ export default function HeroSection() {
                       rel="noreferrer"
                       title={`${r.name} · RERA ${r.rera}: open the official Odisha RERA record`}
                       aria-label={`${r.name}, RERA ${r.rera}. Open the official Odisha RERA record`}
-                      className="group border border-primary-200 bg-white px-3 py-1.5 leading-tight transition-colors hover:border-primary-500"
+                      className="group min-w-0 border border-primary-200 bg-white px-1.5 py-1.5 leading-tight transition-colors hover:border-primary-500 min-[380px]:px-2.5 sm:px-3"
                     >
-                      <span className="block text-[12px] font-semibold text-navy-900">{r.name} ↗</span>
-                      <span className="block text-[10.5px] font-medium tracking-wide text-slate-500 group-hover:text-primary-700">RERA {r.rera}</span>
+                      <span className="block truncate text-[10.5px] font-semibold text-navy-900 sm:text-[12px]">{r.name} ↗</span>
+                      <span className="block truncate text-[9.5px] font-medium text-slate-500 group-hover:text-primary-700 sm:text-[10.5px] sm:tracking-wide">RERA {r.rera}</span>
                     </a>
                   ))}
                 </span>
