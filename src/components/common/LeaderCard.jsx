@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Expand, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowUpRight, Expand, ShieldCheck } from 'lucide-react';
+import { ROUTES } from '@/constants/routes';
 import { Lightbox } from '@/features/home/components/GallerySection';
 import { cn } from '@/utils/cn';
 
@@ -12,13 +14,12 @@ const toSlide = (p) => ({ src: p.photo, alt: `${p.name}, ${p.role}`, title: `${p
  * person: { name, role, photo, photoPos?, photoBg?, badge?, phone?, phoneDisplay? }
  * group: optional list of all leaders shown together, so the full-size viewer can step between them.
  */
-export default function LeaderCard({ person, group, actions = false, waText, footer, fill = false, className }) {
+export default function LeaderCard({ person, group, actions = false, footer, fill = false, className }) {
   const people = useMemo(() => (group?.length ? group : [person]), [group, person]);
   const slides = useMemo(() => people.map(toSlide), [people]);
   const [open, setOpen] = useState(null);
   const nav = useCallback((d) => setOpen((i) => (i + d + slides.length) % slides.length), [slides.length]);
   const close = useCallback(() => setOpen(null), []);
-  const first = person.name.split(' ')[0];
 
   return (
     <article className={cn('flex w-full flex-col bg-white shadow-[0_30px_70px_-40px_rgba(8,38,32,0.55)]', className)}>
@@ -55,20 +56,17 @@ export default function LeaderCard({ person, group, actions = false, waText, foo
 
       {footer && <div className="flex h-[4.5rem] items-stretch p-3">{footer}</div>}
 
-      {actions && person.phone && (
-        <div className="grid h-[4.5rem] grid-cols-[1fr_auto] gap-2 p-3">
-          <a href={`tel:+${person.phone}`} className="flex items-center justify-center gap-2 bg-ivory px-3 py-3 text-[12.5px] font-bold tracking-wide text-navy-950 hover:bg-primary-100">
-            <Phone className="h-4 w-4 text-primary-600" /> {person.phoneDisplay}
-          </a>
-          <a
-            href={`https://wa.me/${person.phone}?text=${encodeURIComponent(waText || `Hi ${first} Ji, I'd like to know more about Sai Krishna Homes.`)}`}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={`WhatsApp ${person.name}`}
-            className="flex w-12 items-center justify-center border border-navy-900/15 hover:border-[#25D366]"
+      {/* no personal numbers on the card: it leads to the Contact page */}
+      {actions && (
+        <div className="flex h-[4.5rem] items-stretch p-3">
+          <Link
+            to={ROUTES.CONTACT}
+            aria-label={`Contact ${person.name}`}
+            className="group flex w-full items-center justify-center gap-2 bg-ivory px-3 py-3 text-[12px] font-bold uppercase tracking-[0.15em] text-navy-950 hover:bg-primary-100"
           >
-            <MessageCircle className="h-5 w-5 text-[#1fa855]" />
-          </a>
+            Contact
+            <ArrowUpRight className="h-4 w-4 text-primary-600 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
         </div>
       )}
 

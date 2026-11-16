@@ -251,7 +251,7 @@ export default function AboutPage() {
             numeral="IV"
             label="Our leadership"
             title="The people behind your home"
-            intro="Questions about a project, a site visit or pricing? Call or WhatsApp our leadership directly."
+            intro="Questions about a project, a site visit or pricing? Reach our team through the Contact page."
           />
           <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <Reveal>

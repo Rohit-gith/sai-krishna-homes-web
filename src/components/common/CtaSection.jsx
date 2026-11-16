@@ -1,4 +1,6 @@
-import { CalendarCheck, MapPin, Phone } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowUpRight, CalendarCheck, MapPin } from 'lucide-react';
+import { ROUTES } from '@/constants/routes';
 import Reveal from './Reveal';
 import ParallaxImage from './ParallaxImage';
 import { COMPANY } from '@/data/companyInfo';
@@ -34,12 +36,14 @@ export default function CtaSection() {
               >
                 <CalendarCheck className="h-5 w-5" /> Book a site visit
               </a>
-              <a
-                href={`tel:${COMPANY.phone}`}
-                className="inline-flex items-center justify-center gap-2 border border-white/40 px-8 py-4 text-[12px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:bg-white/10"
+              {/* no number here: leads to the Contact page */}
+              <Link
+                to={ROUTES.CONTACT}
+                className="group inline-flex items-center justify-center gap-2 border border-white/40 px-8 py-4 text-[12px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:bg-white/10"
               >
-                <Phone className="h-4 w-4" /> {COMPANY.phoneDisplay}
-              </a>
+                Contact us
+                <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </Link>
             </div>
             <a
               href={COMPANY.mapUrl}

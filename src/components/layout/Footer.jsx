@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Clock, Facebook, Instagram, Linkedin, Mail, MapPin, MessageCircle, Phone, Twitter } from 'lucide-react';
+import { ArrowUpRight, Clock, Facebook, Instagram, Linkedin, Mail, MapPin, Phone, Twitter } from 'lucide-react';
 import { FOOTER_LINKS, BOOK_VISIT } from '@/constants/navLinks';
 import { COMPANY, LEADERSHIP } from '@/data/companyInfo';
+import { ROUTES } from '@/constants/routes';
 import logoImg from '@/assets/logo/logo.png';
 
 const SOCIALS = [
@@ -80,7 +81,13 @@ export default function Footer() {
             <TouchBlock icon={Phone} label="Call us">
               <ul className="grid gap-4 sm:grid-cols-2">
                 {LEADERSHIP.contacts.map((c) => (
-                  <li key={c.name} className="flex flex-col border border-white/10 bg-white/[0.03] p-4">
+                  <li key={c.name}>
+                    {/* no personal numbers here: the card leads to the Contact page */}
+                    <Link
+                      to={ROUTES.CONTACT}
+                      aria-label={`Contact ${c.name}`}
+                      className="group flex h-full flex-col border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-primary-300/50 hover:bg-white/[0.06]"
+                    >
                     <div className="mb-4 flex items-start gap-3">
                       <img src={c.photo} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-full border-2 border-primary-300 object-cover object-top" />
                       <span className="min-w-0">
@@ -89,19 +96,12 @@ export default function Footer() {
                       </span>
                     </div>
                     <div className="mt-auto flex items-center justify-between gap-2 border-t border-white/10 pt-3">
-                      <a href={`tel:+${c.phone}`} className="py-1 text-[15px] font-semibold tracking-wide text-white hover:text-primary-200">
-                        {c.phoneDisplay}
-                      </a>
-                      <a
-                        href={`https://wa.me/${c.phone}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`WhatsApp ${c.name}`}
-                        className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/80 hover:border-primary-300 hover:text-primary-200"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                      </a>
+                      <span className="py-1 text-[12px] font-bold uppercase tracking-[0.2em] text-primary-200 group-hover:text-primary-100">Contact</span>
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/80 transition-colors group-hover:border-primary-300 group-hover:text-primary-200">
+                        <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                      </span>
                     </div>
+                    </Link>
                   </li>
                 ))}
               </ul>
