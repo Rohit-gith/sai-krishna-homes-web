@@ -23,8 +23,6 @@ export const SK_NAV = [
   { label: 'Gallery', href: '#gallery' },
   { label: 'Contact', href: '#contact' },
 ];
-
-
 export const SK_CONFIGS = ['Studio', '1 BHK', '2 BHK', '3 BHK'];
 
 export const SK_PROJECTS = ['Sai Krishna Residency', 'Panchawati Residency'];
