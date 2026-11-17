@@ -39,7 +39,7 @@ export default function Footer() {
 
       <div className="container relative">
         {/* Wordmark band */}
-        <div className="flex flex-col gap-8 border-b border-white/10 py-14 md:flex-row md:items-end md:justify-between md:py-20">
+        <div className="flex flex-col gap-8 border-b border-white/10 py-10 md:flex-row md:items-end md:justify-between md:py-12">
           <div className="flex items-end gap-5">
             <span className="block h-[3.4rem] w-14 shrink-0 overflow-hidden md:h-[4.2rem] md:w-[4.3rem]">
               <img src={logoImg} alt="" className="h-auto w-full" />
@@ -61,11 +61,11 @@ export default function Footer() {
         </div>
 
         {/* Get in touch */}
-        <div className="border-b border-white/10 py-14">
+        <div className="border-b border-white/10 py-10 md:py-12">
           <h2 className="font-serif text-3xl text-white md:text-4xl">
             Get in <em className="font-medium text-primary-300">touch</em>
           </h2>
-          <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_1.6fr_1fr] lg:gap-12">
+          <div className="mt-7 grid gap-8 lg:grid-cols-[1fr_1.6fr_1fr] lg:gap-12">
             <TouchBlock icon={MapPin} label="Our location">
               <p className="max-w-xs text-[15px] leading-[1.8] text-white/80">{COMPANY.address}</p>
               <a
@@ -119,10 +119,11 @@ export default function Footer() {
         </div>
 
         {/* Links */}
-        <div className="grid gap-12 py-14 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.3fr]">
+        <div className="grid gap-10 py-10 sm:grid-cols-2 md:py-12 lg:grid-cols-[1.7fr_1fr_1.3fr]">
           <div>
             <p className={heading}>Explore</p>
-            <ul className="space-y-3">
+            {/* long list: two columns on wide screens so it doesn't leave a tall empty band */}
+            <ul className="grid grid-cols-2 gap-x-6 gap-y-3">
               {FOOTER_LINKS.explore.map((l) => (
                 <li key={l.label}>
                   <Link to={l.to} className={link}>

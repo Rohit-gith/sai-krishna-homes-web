@@ -19,7 +19,7 @@ const PROMISES = [
   },
   {
     title: 'Township scale',
-    text: '500+ homes across nearly 6 acres, planned around open greens.',
+    text: '600+ homes across nearly 6 acres, planned around open greens.',
   },
   {
     title: 'Convenience inside the gates',
@@ -54,7 +54,7 @@ export default function WhyChooseUs({ numeral = 'IV' } = {}) {
               />
             </div>
             <p className="mt-5 flex items-baseline justify-between border-t border-navy-900/10 pt-4">
-              <span className="font-serif text-5xl font-semibold text-navy-950">500+</span>
+              <span className="font-serif text-5xl font-semibold text-navy-950">600+</span>
               <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-500">
                 homes across ~6 acres
               </span>

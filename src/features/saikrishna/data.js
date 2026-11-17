@@ -28,7 +28,7 @@ export const SK_CONFIGS = ['Studio', '1 BHK', '2 BHK', '3 BHK'];
 export const SK_PROJECTS = ['Sai Krishna Residency', 'Panchawati Residency'];
 
 export const SK_STATS = [
-  { value: '500+', label: 'Homes in the township' },
+  { value: '600+', label: 'Homes in the township' },
   { value: '6', suffix: 'Acres', label: 'Gated community' },
   { value: '25+', label: 'Premium amenities' },
   { value: 'RERA', label: 'Bank approved & cleared' },

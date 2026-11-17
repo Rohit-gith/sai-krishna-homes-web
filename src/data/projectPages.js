@@ -52,7 +52,7 @@ export const PROJECT_PAGES = [
     ],
     highlightsTitle: 'Project details',
     highlights: [
-      '“Largest Township Project” of Southern Bhubaneswar having more than 500 Flats.',
+      '“Largest Township Project” of Southern Bhubaneswar having more than 600 Flats.',
       'Spread at nearly 6 Acres Of Land and has scope to grow further.',
       'Strategically close to the Cuttack - Bhubaneswar Bypass.',
       'Project is Approved By Rera and all major Banks.',

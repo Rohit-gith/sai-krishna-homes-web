@@ -102,7 +102,7 @@ export default function HomeFinder() {
   const res = step === 3 ? recommend(a.people, a.budget, a.need) : null;
 
   return (
-    <section id="home-finder" className="relative scroll-mt-24 overflow-hidden bg-navy-950 py-20 text-white md:py-28">
+    <section id="home-finder" className="relative scroll-mt-24 overflow-hidden bg-navy-950 py-16 text-white md:py-20">
       <span aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 h-[30rem] w-[30rem] rounded-full bg-primary-400/10 blur-3xl" />
       <div className="container relative max-w-4xl">
         <p className="flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-[0.35em] text-primary-300">
@@ -116,7 +116,7 @@ export default function HomeFinder() {
           ))}
         </div>
 
-        <div className="mt-10 min-h-[22rem]">
+        <div className="mt-10 min-h-[12rem]">
           <AnimatePresence mode="wait">
             {step === 0 && (
               <motion.div key="s0" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.4, ease }}>

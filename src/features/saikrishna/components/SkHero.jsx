@@ -56,7 +56,7 @@ export default function SkHero({ onEnquire }) {
               {...rise(0.35)}
               className="mt-7 max-w-xl font-lux text-base leading-relaxed text-sk-ivory/70 sm:text-lg"
             >
-              A 6-acre gated township of 500+ homes in Southern Bhubaneswar, with resort-style amenities, a
+              A 6-acre gated township of 600+ homes in Southern Bhubaneswar, with resort-style amenities, a
               shopping hub inside the gates, and every approval in place.
             </motion.p>
 

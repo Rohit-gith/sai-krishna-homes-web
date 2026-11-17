@@ -35,16 +35,35 @@ export default function ExploreStrip({ numeral = 'V' }) {
   const reduce = useReducedMotion();
   const wrap = useRef(null);
   const track = useRef(null);
+  const frame = useRef(null);
   const [distance, setDistance] = useState(0);
-  const { scrollYProgress } = useScroll({ target: wrap, offset: ['start start', 'end end'] });
-  const x = useTransform(scrollYProgress, [0, 1], [0, -distance]);
+  // The pinned frame is only as tall as the cards (not the whole screen), so no empty band is left
+  // above or below it. It pins centred in the space under the header; `top` is that pin position.
+  const [pin, setPin] = useState({ h: 0, top: 64 });
+  const pinTop = useRef(64);
+  const { scrollY } = useScroll();
+  // 0 → 1 while the frame is pinned (the wrapper's extra height is exactly `distance`)
+  const progress = useTransform(scrollY, () => {
+    const r = wrap.current?.getBoundingClientRect();
+    if (!r || !distance) return 0;
+    return Math.min(1, Math.max(0, (pinTop.current - r.top) / distance));
+  });
+  const x = useTransform(progress, [0, 1], [0, -distance]);
 
   useLayoutEffect(() => {
     if (reduce) return undefined;
-    const measure = () => track.current && setDistance(Math.max(0, track.current.scrollWidth - window.innerWidth));
+    const measure = () => {
+      if (track.current) setDistance(Math.max(0, track.current.scrollWidth - window.innerWidth));
+      const h = frame.current?.offsetHeight || 0;
+      const hdr = window.innerWidth >= 768 ? 92 : 64;
+      const top = Math.round(Math.max(hdr, (window.innerHeight + hdr) / 2 - h / 2));
+      pinTop.current = top;
+      setPin((p) => (p.h === h && p.top === top ? p : { h, top }));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     if (track.current) ro.observe(track.current);
+    if (frame.current) ro.observe(frame.current);
     window.addEventListener('resize', measure);
     return () => {
       ro.disconnect();
@@ -71,9 +90,9 @@ export default function ExploreStrip({ numeral = 'V' }) {
           ))}
         </div>
       ) : (
-        <div ref={wrap} className="relative" style={{ height: `calc(100svh + ${distance}px)` }}>
-          {/* Pinned below the sticky header */}
-          <div className="sticky top-16 flex h-[calc(100svh-4rem)] flex-col justify-center overflow-hidden md:top-[5.75rem] md:h-[calc(100svh-5.75rem)]">
+        <div ref={wrap} className="relative" style={{ height: pin.h ? pin.h + distance : `calc(100svh + ${distance}px)` }}>
+          {/* Pinned below the sticky header, centred in the free space */}
+          <div ref={frame} className="sticky overflow-hidden py-10" style={{ top: pin.top }}>
             <motion.div ref={track} style={{ x }} className={`flex w-max gap-4 lg:gap-6 ${PAD}`}>
               {CHAPTERS.map((c, i) => (
                 <Card key={c.slug} c={c} i={i} />
@@ -82,7 +101,7 @@ export default function ExploreStrip({ numeral = 'V' }) {
             {/* progress */}
             <div className="container mt-8">
               <div className="h-px w-full bg-navy-900/10">
-                <motion.div className="h-px origin-left bg-primary-500" style={{ scaleX: scrollYProgress }} />
+                <motion.div className="h-px origin-left bg-primary-500" style={{ scaleX: progress }} />
               </div>
             </div>
           </div>

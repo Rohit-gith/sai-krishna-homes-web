@@ -170,7 +170,7 @@ export function Reveal({ id, children }) {
 /** A short line between sections that makes the visitor want to see the next one. */
 export function HookLine({ children, emoji, dark = false }) {
   return (
-    <div className={cn('relative py-10 text-center md:py-14', dark ? 'bg-navy-950' : 'bg-ivory')}>
+    <div className={cn('hook-line relative pb-2 pt-10 text-center md:pb-4 md:pt-12', dark ? 'bg-navy-950' : 'bg-ivory')}>
       <motion.p
         className={cn('mx-auto max-w-2xl px-6 font-serif text-[1.35rem] italic leading-snug md:text-[1.9rem]', dark ? 'text-primary-200' : 'text-navy-900')}
         initial={{ opacity: 0, y: 24 }}

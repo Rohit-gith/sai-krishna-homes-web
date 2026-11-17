@@ -63,6 +63,13 @@
     @apply py-16 md:py-24;
   }
 
+  /* A hook line already leads into the next section, so that section's own top padding is
+     trimmed: otherwise the two stack into a big empty band between the line and the heading. */
+  .hook-line + * > section:not(#compare),
+  .hook-line + * > #compare > .section:first-child {
+    @apply pt-8 md:pt-12;
+  }
+
   .text-gradient {
     @apply bg-gradient-to-r from-primary-700 via-primary-500 to-primary-700 bg-clip-text text-transparent;
   }

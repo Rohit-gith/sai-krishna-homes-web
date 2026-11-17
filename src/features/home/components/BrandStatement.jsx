@@ -4,7 +4,7 @@ import { COMPANY } from '@/data/companyInfo';
 
 const FIGURES = [
   { value: 2010, label: 'Year founded', plain: true },
-  { value: 500, suffix: '+', label: 'Homes in the township' },
+  { value: 600, suffix: '+', label: 'Homes in the township' },
   { value: 6, suffix: ' acres', label: 'Gated community' },
   { value: 25, suffix: '+', label: 'Curated amenities' },
   { value: 2, label: 'Signature projects' },

@@ -154,7 +154,7 @@ export default function AboutPage() {
             <Reveal delay={0.1} className="grid grid-cols-2 gap-px self-start border border-navy-900/10 bg-navy-900/10">
               {[
                 [COMPANY.established, 'Established'],
-                ['500+', 'Homes in the township'],
+                ['600+', 'Homes in the township'],
                 ['6 acres', 'Gated community'],
                 ['2', 'Signature projects'],
               ].map(([v, l]) => (
