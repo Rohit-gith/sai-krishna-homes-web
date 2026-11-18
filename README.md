@@ -8,25 +8,63 @@ Official website of **Sai Krishna Homes Pvt. Ltd.** (Bhubaneswar), built with Re
 | -------------- | -------------------------------- |
 | UI             | React 18 + Vite 5                |
 | Styling        | Tailwind CSS 3 + PostCSS         |
-| State          | Zustand (with `persist` for drafts) |
+| State          | Zustand                          |
 | Routing        | React Router 6 (lazy-loaded pages) |
 | Forms          | React Hook Form + Zod            |
 | Animation      | Framer Motion                    |
 | Icons          | lucide-react                     |
 
-## Getting started
+## Repository layout
 
-```bash
-npm install
-cp .env.example .env     # optional
-npm run dev              # http://localhost:5173
-npm run build            # production build in /dist
-npm run preview          # preview the production build
-npm run lint             # ESLint
-npm run format           # Prettier
+```
+apc-agencies-web/
+├── frontend/   # the website + admin panel (React, Vite, Tailwind)
+└── backend/    # the API (Node, Express, MongoDB): website enquiries, admin login, CRM
 ```
 
-## Folder structure
+The website calls the API at `/api/*` on its own address. In development Vite forwards `/api` to the
+backend on port 8787; on Vercel, `frontend/vercel.json` rewrites `/api/*` to the backend deployment.
+Keeping it same-origin is what lets the admin's login cookie stay `httpOnly` and simple.
+
+## Running locally
+
+Two terminals:
+
+```bash
+# 1) backend
+cd backend
+npm install
+npm run dev:memory        # throwaway in-memory MongoDB + test admin: admin@test.local / Test@12345
+# or, with a real database: cp .env.example .env, fill it in, then `npm run dev`
+
+# 2) frontend
+cd frontend
+npm install
+npm run dev               # http://localhost:5174  (admin: /login)
+```
+
+Other commands: `frontend` → `npm run build`, `npm run lint`, `npm run format`;
+`backend` → `npm test` (17 API tests on an in-memory MongoDB), `npm run create-admin -- <email> "<Name>" "<password>"`.
+
+## Backend (API)
+
+| Route | Who | What |
+| --- | --- | --- |
+| `POST /api/enquiries` | public | every website form (contact, brochure, project enquiry, site visit). Validated, rate-limited (8 per IP / 10 min), honeypot, emails the owner |
+| `POST /api/auth/login` · `logout` · `GET me` | admin | bcrypt passwords, 8-hour JWT in an `httpOnly` cookie, 6 tries / 15 min |
+| `GET/PATCH/DELETE /api/enquiries/:id` | admin | enquiries inbox |
+| `/api/leads` (+ `/status`, `/:id/commit`, `/:id/reopen`, `/:id/attempts`, `/import`, `/delete`) | admin | CRM: pipeline, won/lost, attempts, Excel import |
+
+MongoDB collections: `enquiries`, `leads`, `admins`, `counters` (lead numbers SKH-0001…), `ratelimits` (self-expiring).
+
+### Deploying (two Vercel projects from this one repo)
+
+1. **MongoDB Atlas**: create a free cluster, a database user, and allow access from anywhere (`0.0.0.0/0`, Vercel has no fixed IP). Copy the connection string.
+2. **Backend project** on Vercel: import the repo, *Root Directory* = `backend`, project name `sai-krishna-homes-api`. Add the variables from `backend/.env.example` (`MONGODB_URI`, `JWT_SECRET`, `ALLOWED_ORIGINS`, and the `SMTP_*` / `ALERT_TO` ones for email alerts).
+3. **Frontend project** (the existing one): *Root Directory* = `frontend`. If the backend got a different URL, update it in `frontend/vercel.json`.
+4. Create each admin login once: `cd backend && npm run create-admin -- name@example.com "Full Name" "a-strong-password"` (with `.env` pointing at Atlas).
+
+## Frontend folder structure (`frontend/`)
 
 ```
 src/
@@ -44,7 +82,7 @@ src/
 │   ├── application-status/ # Status search + timeline
 │   └── contact/          # Contact form & info cards
 ├── pages/                # One file per route; composes features
-├── services/             # API layer (mock until backend is ready)
+├── services/             # API layer (crmApi.js talks to ../backend)
 ├── store/                # Global Zustand stores (UI: menu, toasts)
 ├── data/                 # Editable content (services, products, FAQs, company info)
 ├── constants/            # Routes, nav links, form options

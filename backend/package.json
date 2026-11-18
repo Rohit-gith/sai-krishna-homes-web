@@ -1,0 +1,29 @@
+{
+  "name": "sai-krishna-homes-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Backend API for the Sai Krishna Homes website: enquiries, admin login and CRM (Node + Express + MongoDB)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --env-file=.env --watch src/dev.js",
+    "start": "node --env-file-if-exists=.env src/dev.js",
+    "dev:memory": "node scripts/dev-memory.js",
+    "create-admin": "node --env-file=.env scripts/create-admin.js",
+    "test": "node --test --test-timeout=300000 test/*.test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "2.4.3",
+    "cookie-parser": "1.4.7",
+    "express": "4.21.2",
+    "jsonwebtoken": "9.0.2",
+    "mongodb": "6.12.0",
+    "nodemailer": "6.9.16",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "10.1.3"
+  }
+}
