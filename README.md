@@ -60,8 +60,8 @@ MongoDB collections: `enquiries`, `leads`, `admins`, `counters` (lead numbers SK
 ### Deploying (two Vercel projects from this one repo)
 
 1. **MongoDB Atlas**: create a free cluster, a database user, and allow access from anywhere (`0.0.0.0/0`, Vercel has no fixed IP). Copy the connection string.
-2. **Backend project** on Vercel: import the repo, *Root Directory* = `backend`, project name `sai-krishna-homes-api`. Add the variables from `backend/.env.example` (`MONGODB_URI`, `JWT_SECRET`, `ALLOWED_ORIGINS`, and the `SMTP_*` / `ALERT_TO` ones for email alerts).
-3. **Frontend project** (the existing one): *Root Directory* = `frontend`. If the backend got a different URL, update it in `frontend/vercel.json`.
+2. **Backend project** on Vercel: import the repo, *Root Directory* = `backend`, project name `sai-krishna-homes-api` (Vercel gave it the address `sai-krishna-homes-web-nkvn.vercel.app`). Add the variables from `backend/.env.example` (`MONGODB_URI`, `JWT_SECRET`, `ALLOWED_ORIGINS`, and the `SMTP_*` / `ALERT_TO` ones for email alerts).
+3. **Frontend project** (the existing one): *Root Directory* = `frontend`. The backend address is set in the `/api` rewrite in `frontend/vercel.json`; change it there if the backend project ever moves.
 4. Create each admin login once: `cd backend && npm run create-admin -- name@example.com "Full Name" "a-strong-password"` (with `.env` pointing at Atlas).
 
 ## Frontend folder structure (`frontend/`)

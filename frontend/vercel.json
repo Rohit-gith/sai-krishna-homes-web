@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://sai-krishna-homes-api.vercel.app/api/:path*"
+      "destination": "https://sai-krishna-homes-web-nkvn.vercel.app/api/:path*"
     },
     {
       "source": "/((?!api/).*)",
