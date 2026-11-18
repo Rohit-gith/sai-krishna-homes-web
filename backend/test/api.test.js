@@ -152,3 +152,30 @@ describe('CRM', () => {
     assert.match(r.set, /skh_admin=;/);
   });
 });
+
+describe('activity log', () => {
+  test('logins, failed logins and logouts are recorded with time, IP and device', async () => {
+    const h = { 'User-Agent': 'TestBrowser/1.0', 'X-Forwarded-For': '10.9.9.9' };
+    await call('/api/auth/login', { method: 'POST', body: { email: 'admin@test.in', password: 'wrong-one' }, auth: false, headers: h });
+    const ok = await call('/api/auth/login', { method: 'POST', body: { email: 'admin@test.in', password: 'Secret12345' }, auth: false, headers: h });
+    cookie = ok.set.split(';')[0];
+    const list = (await call('/api/activity')).body;
+    const latest = list[0];
+    assert.equal(latest.type, 'login');
+    assert.equal(latest.email, 'admin@test.in');
+    assert.equal(latest.name, 'Test Admin');
+    assert.equal(latest.ip, '10.9.9.9');
+    assert.equal(latest.device, 'TestBrowser/1.0');
+    assert.ok(!Number.isNaN(Date.parse(latest.at)));
+    assert.equal(list[1].type, 'login_failed');
+    assert.equal(list[1].note, 'Wrong password');
+    // earlier logout in the CRM suite was recorded too
+    assert.ok(list.some((a) => a.type === 'logout'));
+  });
+  test('filter by type, and login is required', async () => {
+    const failed = (await call('/api/activity?type=login_failed')).body;
+    assert.ok(failed.length >= 1 && failed.every((a) => a.type === 'login_failed'));
+    assert.equal((await call('/api/activity?type=nonsense')).status, 400);
+    assert.equal((await call('/api/activity', { auth: false })).status, 401);
+  });
+});

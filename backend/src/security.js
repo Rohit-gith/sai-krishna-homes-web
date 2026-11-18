@@ -27,6 +27,16 @@ export function clearSession(res) {
   res.clearCookie(COOKIE, { path: '/' });
 }
 
+/** Who is logged in (or null), without rejecting the request. */
+export function readSession(req) {
+  try {
+    const token = req.cookies?.[COOKIE];
+    return token ? jwt.verify(token, secret()) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Admin-only routes: a valid session cookie is required. */
 export function requireAdmin(req, res, next) {
   try {

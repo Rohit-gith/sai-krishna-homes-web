@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.js';
 import enquiryRoutes from './routes/enquiries.js';
 import leadRoutes from './routes/leads.js';
+import activityRoutes from './routes/activity.js';
 import { sameOrigin } from './security.js';
 
 /** The whole API. Runs on Vercel as one serverless function (api/index.js) and locally via server/dev.js. */
@@ -23,6 +24,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/activity', activityRoutes);
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 

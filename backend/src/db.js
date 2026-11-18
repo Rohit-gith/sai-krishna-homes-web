@@ -38,6 +38,8 @@ async function ensureIndexes(db) {
     // rate-limit hits expire on their own
     db.collection('ratelimits').createIndex({ at: 1 }, { expireAfterSeconds: 3600 }),
     db.collection('ratelimits').createIndex({ key: 1, at: -1 }),
+    db.collection('activity').createIndex({ at: -1 }),
+    db.collection('activity').createIndex({ email: 1, at: -1 }),
   ]);
 }
 

@@ -12,6 +12,7 @@
     "start": "node --env-file-if-exists=.env src/dev.js",
     "dev:memory": "node scripts/dev-memory.js",
     "create-admin": "node --env-file=.env scripts/create-admin.js",
+    "create-admin:live": "node --env-file=.env scripts/create-admin.js --live",
     "test": "node --test --test-timeout=300000 test/*.test.js"
   },
   "dependencies": {
