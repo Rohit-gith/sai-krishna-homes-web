@@ -1,4 +1,6 @@
-import { Footprints, MessageCircle, Phone, Timer } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowUpRight, Footprints, MessageCircle, Phone, Timer } from 'lucide-react';
+import { ROUTES } from '@/constants/routes';
 import LeaderCard from '@/components/common/LeaderCard';
 import Reveal from '@/components/common/Reveal';
 
@@ -20,25 +22,31 @@ export default function LeadershipConnect({ project }) {
           <li className="flex items-center gap-1.5 bg-ivory px-3 py-2"><Footprints className="h-4 w-4 text-primary-600" /> Guided Site Visit</li>
         </ul>
         <div className="mt-auto grid gap-3 pt-7">
-          <a href={`tel:+${c.phone}`} className="flex items-center gap-3 bg-navy-900 px-5 py-4 text-white hover:bg-navy-800">
+          {/* no personal numbers here: both lead to the Contact page */}
+          <Link
+            to={ROUTES.CONTACT}
+            aria-label={`Contact ${first} through the Contact page`}
+            className="group flex items-center gap-3 bg-navy-900 px-5 py-4 text-white hover:bg-navy-800"
+          >
             <Phone className="h-5 w-5 text-primary-300" />
-            <span>
+            <span className="flex-1">
               <span className="block text-[10px] font-bold uppercase tracking-[0.22em] text-white/60">Direct Call</span>
-              <span className="block text-[15px] font-bold tracking-wide">{c.phoneDisplay}</span>
+              <span className="block text-[15px] font-bold tracking-wide">Get in touch</span>
             </span>
-          </a>
-          <a
-            href={`https://wa.me/${c.phone}?text=${encodeURIComponent(`Hi ${first} Ji, I am interested in ${project.name}.`)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-3 border border-navy-900/15 px-5 py-4 hover:border-[#25D366]"
+            <ArrowUpRight className="h-5 w-5 text-primary-300 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
+          <Link
+            to={ROUTES.CONTACT}
+            aria-label={`Message ${first} through the Contact page`}
+            className="group flex items-center gap-3 border border-navy-900/15 px-5 py-4 hover:border-primary-400"
           >
             <MessageCircle className="h-5 w-5 text-[#1fa855]" />
-            <span>
+            <span className="flex-1">
               <span className="block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Instant Chat</span>
-              <span className="block text-[15px] font-bold text-navy-950">WhatsApp Now</span>
+              <span className="block text-[15px] font-bold text-navy-950">Message us</span>
             </span>
-          </a>
+            <ArrowUpRight className="h-5 w-5 text-primary-600 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
         </div>
       </div>
     </Reveal>

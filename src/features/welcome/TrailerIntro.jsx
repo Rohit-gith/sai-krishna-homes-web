@@ -47,7 +47,7 @@ export function firstVisit() {
  * Short (~17 s) "trailer" for a visitor's very first visit: logo → the city from above → the home by day,
  * turning to night as its lights come on → a golden key turns: "Welcome home" → the curtain opens.
  * Extras: the logo is first drawn in gold lines; the home appears as an architect's blueprint before
- * a gold scan line reveals the real building; the last scene offers "Find my home" / "Book a site visit". Shown once per browser (localStorage), with Skip.
+ * a gold scan line reveals the real building; the last scene offers "Find my home" / "Book a site visit". Shown once per browser (localStorage). No Skip: it plays in full.
  * `always` replays it every time (e.g. for a demo).
  */
 export default function TrailerIntro({ always = false, playKey = 0 }) {
@@ -413,15 +413,8 @@ export default function TrailerIntro({ always = false, playKey = 0 }) {
               </AnimatePresence>
             </div>
 
-            {/* progress + skip */}
+            {/* progress. No Skip button (client's call): the trailer plays in full, then closes by itself */}
             <motion.span className="absolute bottom-0 left-0 h-[3px] bg-primary-400" initial={{ width: '0%' }} animate={{ width: ready ? '100%' : '6%' }} transition={{ duration: ready ? total : 1.5, ease: 'linear' }} />
-            <button
-              type="button"
-              onClick={() => setShow(false)}
-              className="absolute bottom-6 right-6 rounded-full border border-white/25 bg-black/30 px-4 py-2 text-[10.5px] font-bold uppercase tracking-[0.3em] text-white/80 backdrop-blur hover:border-primary-300 hover:text-white"
-            >
-              Skip
-            </button>
           </motion.div>
         </motion.div>
       )}
