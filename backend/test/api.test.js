@@ -138,6 +138,24 @@ describe('CRM', () => {
     const n = await call('/api/leads', { method: 'POST', body: { name: 'Next One', phone: '9123456780' } });
     assert.equal(n.body.id, 'SKH-0004');
   });
+  test('excel import: one over-long cell never fails the whole import', async () => {
+    const r = await call('/api/leads/import', { method: 'POST', body: { drafts: [
+      { name: 'Long Config', phone: '9000000201', config: 'Wants a corner flat facing east with garden view near the main gate', notes: 'Remark 1: hi' },
+      { name: 'Long Notes', phone: '9000000202', config: '2 BHK', notes: 'R'.repeat(12000), priceMin: 'abc', status: 'weird' },
+      { name: 'N'.repeat(200), phone: 9000000203, createdAt: null, sheet: null },
+    ] } });
+    assert.equal(r.status, 201);
+    const [a, b, c] = ['Long Config', 'Long Notes'].map((n) => r.body.find((l) => l.name === n)).concat(r.body.find((l) => l.name.startsWith('NNN')));
+    assert.equal(a.config, '');
+    assert.match(a.notes, /^Configuration: Wants a corner flat/);
+    assert.match(a.notes, /Remark 1: hi$/);
+    assert.equal(b.config, '2 BHK');
+    assert.equal(b.notes.length, 10000);
+    assert.equal(b.priceMin, 0);
+    assert.equal(b.status, 'new');
+    assert.equal(c.name.length, 80);
+    assert.equal(c.phone, '9000000203');
+  });
   test('update and delete', async () => {
     assert.equal((await call(`/api/leads/${id}`, { method: 'PATCH', body: { notes: 'VIP' } })).body.notes, 'VIP');
     assert.equal((await call('/api/leads/delete', { method: 'POST', body: { ids: [id] } })).body.deleted, 1);

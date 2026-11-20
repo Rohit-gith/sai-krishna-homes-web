@@ -20,11 +20,18 @@ const by = (req) => req.admin?.name || req.admin?.email || 'Admin';
 
 const str = (max) => z.string().trim().max(max);
 const money = z.coerce.number().min(0).max(1e11);
-const date = z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}/)).nullable();
+const date = z
+  .string()
+  .datetime({ offset: true })
+  .or(z.string().regex(/^\d{4}-\d{2}-\d{2}/))
+  .nullable();
 
 const LeadFields = z.object({
   name: str(80).min(2),
-  phone: z.string().trim().regex(/^[6-9]\d{9}$/),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^[6-9]\d{9}$/),
   email: z.union([z.literal(''), z.string().trim().email().max(120)]).default(''),
   project: str(80).default(''),
   config: str(40).default(''),
@@ -100,7 +107,12 @@ r.post('/status', async (req, res) => {
           filter: { id: l.id },
           update: {
             $set: { status: p.data.status, updatedAt: at },
-            $push: { history: { $each: [{ id: uid(), at, text: `Status: ${l.status} → ${p.data.status} (${by(req)})` }], $position: 0 } },
+            $push: {
+              history: {
+                $each: [{ id: uid(), at, text: `Status: ${l.status} → ${p.data.status} (${by(req)})` }],
+                $position: 0,
+              },
+            },
           },
         },
       })),
@@ -128,7 +140,8 @@ r.post('/:id/commit', async (req, res) => {
     closed: { ...c, at: now(), by: by(req) },
     nextFollowUp: null,
   };
-  const text = c.result === 'won' ? `Deal WON and committed by ${by(req)}` : `Deal LOST and committed (${c.reason}) by ${by(req)}`;
+  const text =
+    c.result === 'won' ? `Deal WON and committed by ${by(req)}` : `Deal LOST and committed (${c.reason}) by ${by(req)}`;
   return res.json(strip(await change(lead.id, set, text)));
 });
 
@@ -161,17 +174,22 @@ r.post('/:id/attempts', async (req, res) => {
   return res.json(strip(doc));
 });
 
+// Excel cells can hold anything, so an import never fails because one cell is too long:
+// text is trimmed and cut to size instead of rejected (a whole sheet shouldn't be lost over one cell).
+const cut = (max) =>
+  z.any().transform((v) => (v === null || v === undefined ? '' : String(v)).replace(/\s+$/g, '').trim().slice(0, max));
+const CONFIG_MAX = 40;
 const Draft = z.object({
-  name: str(80).min(1),
-  phone: str(20).min(5),
-  project: str(80).default(''),
-  config: str(40).default(''),
-  priceMin: money.default(0),
-  priceMax: money.default(0),
-  createdAt: z.string().max(40).optional().nullable(),
-  notes: str(3000).default(''),
-  status: z.enum(['new', 'contacted', 'visit', 'negotiation', 'won', 'lost']).default('new'),
-  sheet: str(80).optional().nullable(),
+  name: cut(80).refine((s) => s.length > 0),
+  phone: cut(20).refine((s) => s.length >= 5),
+  project: cut(80),
+  config: cut(2000), // a long free-text "configuration" moves into the notes below
+  priceMin: money.catch(0),
+  priceMax: money.catch(0),
+  createdAt: z.any().optional(),
+  notes: cut(10000),
+  status: z.enum(['new', 'contacted', 'visit', 'negotiation', 'won', 'lost']).catch('new'),
+  sheet: cut(80),
 });
 
 /** Excel import: many leads in one request, IDs reserved as a block. */
@@ -183,28 +201,38 @@ r.post('/import', async (req, res) => {
   const last = await nextSeq(db, 'lead', drafts.length);
   const start = last - drafts.length + 1;
   const stamp = now();
-  const created = drafts.map((d, i) => ({
-    id: leadId(start + i),
-    name: d.name,
-    phone: d.phone,
-    email: '',
-    project: d.project,
-    config: d.config,
-    source: 'Excel import',
-    budget: 0,
-    dealValue: 0,
-    priceMin: d.priceMin,
-    priceMax: d.priceMax,
-    status: d.status,
-    nextFollowUp: null,
-    notes: d.notes,
-    demo: false,
-    closed: null,
-    attempts: [],
-    history: [{ id: uid(), at: stamp, text: `Imported from Excel${d.sheet ? ` (sheet "${d.sheet}")` : ''} by ${by(req)}` }],
-    createdAt: d.createdAt && !Number.isNaN(Date.parse(d.createdAt)) ? new Date(d.createdAt).toISOString() : stamp,
-    updatedAt: stamp,
-  }));
+  const created = drafts.map((d, i) => {
+    const longConfig = d.config.length > CONFIG_MAX;
+    const notes = (longConfig ? `Configuration: ${d.config}${d.notes ? '\n' : ''}${d.notes}` : d.notes).slice(0, 10000);
+    const at =
+      typeof d.createdAt === 'string' && !Number.isNaN(Date.parse(d.createdAt))
+        ? new Date(d.createdAt).toISOString()
+        : stamp;
+    return {
+      id: leadId(start + i),
+      name: d.name,
+      phone: d.phone,
+      email: '',
+      project: d.project,
+      config: longConfig ? '' : d.config,
+      source: 'Excel import',
+      budget: 0,
+      dealValue: 0,
+      priceMin: d.priceMin,
+      priceMax: d.priceMax,
+      status: d.status,
+      nextFollowUp: null,
+      notes,
+      demo: false,
+      closed: null,
+      attempts: [],
+      history: [
+        { id: uid(), at: stamp, text: `Imported from Excel${d.sheet ? ` (sheet "${d.sheet}")` : ''} by ${by(req)}` },
+      ],
+      createdAt: at,
+      updatedAt: stamp,
+    };
+  });
   await db.collection('leads').insertMany(created.map((x) => ({ ...x })));
   created.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return res.status(201).json(created);

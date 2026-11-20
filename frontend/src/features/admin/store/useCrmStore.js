@@ -104,15 +104,28 @@ export const useCrmStore = create((set, get) => ({
     }
   },
 
-  /** Excel import. Resolves to the number of leads created. */
-  importLeads: async (drafts) => {
-    try {
-      const created = await api('/leads/import', { method: 'POST', body: { drafts } });
-      set((s) => ({ leads: [...created, ...s.leads] }));
-      return created.length;
-    } catch (e) {
-      return fail(e);
+  /**
+   * Excel import, sent in batches of 500 rows so a file of any size works (each request stays small and
+   * quick). onProgress(done, total) is called after every batch. Resolves to { done, total, error }:
+   * if a batch fails, the earlier batches are already saved; importing the same file again is safe
+   * because rows already in the CRM (same phone) are skipped.
+   */
+  importLeads: async (drafts, onProgress) => {
+    const BATCH = 500;
+    let done = 0;
+    for (let i = 0; i < drafts.length; i += BATCH) {
+      try {
+        const created = await api('/leads/import', { method: 'POST', body: { drafts: drafts.slice(i, i + BATCH) } });
+        set((s) => ({ leads: [...created, ...s.leads] }));
+        done += created.length;
+        onProgress?.(done, drafts.length);
+      } catch (e) {
+        return { done, total: drafts.length, error: e.message || 'Import failed.' };
+      }
     }
+    // newest first, as everywhere else in the CRM
+    set((s) => ({ leads: [...s.leads].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }));
+    return { done, total: drafts.length, error: '' };
   },
 
   deleteLeads: async (ids) => {

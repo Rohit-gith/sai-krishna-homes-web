@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { FileSpreadsheet, Upload } from 'lucide-react';
 import { Modal, Btn, Field, fieldCls } from './ui';
 import { PROJECTS } from '../constants';
@@ -20,6 +20,7 @@ export default function ImportLeadsModal({ open, onClose }) {
   const [project, setProject] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState(null);
 
   const reset = () => {
     setFileName('');
@@ -29,6 +30,7 @@ export default function ImportLeadsModal({ open, onClose }) {
     setError('');
   };
   const close = () => {
+    if (busy) return; // don't drop an import half-way
     reset();
     onClose();
   };
@@ -57,8 +59,10 @@ export default function ImportLeadsModal({ open, onClose }) {
   };
 
   /** Classify rows: invalid, duplicate (already in CRM / repeated in file), or ready. */
+  const frozen = useRef(null);
   const summary = useMemo(() => {
     if (!parsed) return null;
+    if (busy && frozen.current) return frozen.current; // keep the numbers steady while batches land
     const existing = new Set(leads.map((l) => l.phone));
     const seen = new Set();
     const ready = [];
@@ -77,8 +81,9 @@ export default function ImportLeadsModal({ open, onClose }) {
         }
       }
     }
-    return { ready, invalid, inCrm, repeated };
-  }, [parsed, chosen, leads]);
+    frozen.current = { ready, invalid, inCrm, repeated };
+    return frozen.current;
+  }, [parsed, chosen, leads, busy]);
 
   const doImport = async () => {
     if (busy) return;
@@ -96,10 +101,20 @@ export default function ImportLeadsModal({ open, onClose }) {
       notes: r.remarks.map((t, i) => `Remark ${i + 1}: ${t}`).join('\n'),
     }));
     setBusy(true);
-    const n = await importLeads(drafts);
+    setError('');
+    setProgress({ done: 0, total: drafts.length });
+    const r = await importLeads(drafts, (done, total) => setProgress({ done, total }));
     setBusy(false);
-    if (n == null) return;
-    toast(`${n} leads imported`);
+    setProgress(null);
+    if (r.error) {
+      // earlier batches are saved; the rows still listed here are the ones left to import
+      setError(
+        `${r.done.toLocaleString('en-IN')} of ${r.total.toLocaleString('en-IN')} leads were imported, then it stopped: ${r.error} ` +
+          'Click Import again to bring in the rest. Leads already imported are skipped automatically.',
+      );
+      return;
+    }
+    toast(`${r.done.toLocaleString('en-IN')} leads imported`);
     close();
   };
 
@@ -125,8 +140,24 @@ export default function ImportLeadsModal({ open, onClose }) {
         <div className="space-y-5">
           <p className="flex items-center gap-2 text-sm text-slate-600">
             <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> <span className="truncate font-semibold text-navy-950">{fileName}</span>
-            <button type="button" onClick={reset} className="ml-auto shrink-0 font-semibold text-primary-700 hover:underline">Change file</button>
+            <button type="button" onClick={reset} disabled={busy} className="ml-auto shrink-0 font-semibold text-primary-700 hover:underline disabled:opacity-50">Change file</button>
           </p>
+
+          {progress && (
+            <div role="status" aria-live="polite">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-emerald-600 transition-[width] duration-300"
+                  style={{ width: `${Math.max(3, (progress.done / progress.total) * 100)}%` }}
+                />
+              </div>
+              <p className="mt-1.5 text-xs font-semibold text-slate-600">
+                Importing {progress.done.toLocaleString('en-IN')} / {progress.total.toLocaleString('en-IN')}… please keep this window open.
+              </p>
+            </div>
+          )}
+          {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm font-medium text-rose-700">{error}</p>}
+
 
           <Field label="Sheets to import">
             <div className="flex flex-wrap gap-2">
@@ -199,9 +230,9 @@ export default function ImportLeadsModal({ open, onClose }) {
           )}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Btn variant="outline" onClick={close}>Cancel</Btn>
+            <Btn variant="outline" onClick={close} disabled={busy}>Cancel</Btn>
             <Btn onClick={doImport} disabled={busy || !summary.ready.length}>
-              <Upload className="h-4 w-4" /> Import {summary.ready.length} leads
+              <Upload className="h-4 w-4" /> {busy ? 'Importing…' : `Import ${summary.ready.length.toLocaleString('en-IN')} leads`}
             </Btn>
           </div>
         </div>

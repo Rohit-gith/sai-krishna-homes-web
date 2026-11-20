@@ -44,7 +44,7 @@ export default defineConfig({
     open: true,
     // the backend (../backend, `npm run dev` there) runs on 8787; same-origin /api keeps the login cookie simple
     proxy: {
-      '/api': { target: 'http://localhost:8787', changeOrigin: false },
+      '/api': { target: process.env.API_URL || 'http://localhost:8787', changeOrigin: false },
     },
   },
 });
