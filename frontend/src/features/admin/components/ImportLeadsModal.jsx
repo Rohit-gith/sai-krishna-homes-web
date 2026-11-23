@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { FileSpreadsheet, Upload } from 'lucide-react';
 import { Modal, Btn, Field, fieldCls } from './ui';
-import { PROJECTS } from '../constants';
+import { useProjectNames } from '../store/useCrmStore';
 import { useCrmStore } from '../store/useCrmStore';
 import { parseLeadsWorkbook } from '../importLeads';
 import { useUiStore } from '@/store/useUiStore';
@@ -10,6 +10,7 @@ import { cn } from '@/utils/cn';
 
 /** Upload an .xlsx of leads → preview (valid / duplicate / invalid) → import into the CRM. */
 export default function ImportLeadsModal({ open, onClose }) {
+  const projectNames = useProjectNames();
   const leads = useCrmStore((s) => s.leads);
   const importLeads = useCrmStore((s) => s.importLeads);
   const toast = useUiStore((s) => s.showToast);
@@ -50,7 +51,10 @@ export default function ImportLeadsModal({ open, onClose }) {
       setFileName(file.name);
       setParsed(res);
       setChosen(res.sheets.filter((s) => s.rows.length).map((s) => s.name));
-      setProject(PROJECTS.find((p) => file.name.toLowerCase().includes(p.split(' ')[0].toLowerCase())) || '');
+      setProject(
+        projectNames.find((p) => file.name.toLowerCase().includes(p.split(' ')[0].toLowerCase())) ||
+          '',
+      );
     } catch (err) {
       setError(`Could not read this file: ${err.message}`);
     } finally {
@@ -129,18 +133,38 @@ export default function ImportLeadsModal({ open, onClose }) {
             )}
           >
             <FileSpreadsheet className="h-10 w-10 text-emerald-600" />
-            <span className="mt-3 font-semibold text-navy-950">{busy ? 'Reading file…' : 'Choose an Excel file (.xlsx)'}</span>
-            <span className="mt-1 text-sm text-slate-500">Columns like Date, Name, Phone, Configuration, Price, Remarks are detected automatically.</span>
-            <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={onFile} className="sr-only" />
+            <span className="mt-3 font-semibold text-navy-950">
+              {busy ? 'Reading file…' : 'Choose an Excel file (.xlsx)'}
+            </span>
+            <span className="mt-1 text-sm text-slate-500">
+              Columns like Date, Name, Phone, Configuration, Price, Remarks are detected
+              automatically.
+            </span>
+            <input
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={onFile}
+              className="sr-only"
+            />
           </label>
           {error && <p className="mt-3 text-sm font-medium text-rose-600">{error}</p>}
-          <p className="mt-4 text-xs text-slate-500">The file is read inside this browser only; it is not uploaded anywhere.</p>
+          <p className="mt-4 text-xs text-slate-500">
+            The file is read inside this browser only; it is not uploaded anywhere.
+          </p>
         </div>
       ) : (
         <div className="space-y-5">
           <p className="flex items-center gap-2 text-sm text-slate-600">
-            <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> <span className="truncate font-semibold text-navy-950">{fileName}</span>
-            <button type="button" onClick={reset} disabled={busy} className="ml-auto shrink-0 font-semibold text-primary-700 hover:underline disabled:opacity-50">Change file</button>
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />{' '}
+            <span className="truncate font-semibold text-navy-950">{fileName}</span>
+            <button
+              type="button"
+              onClick={reset}
+              disabled={busy}
+              className="ml-auto shrink-0 font-semibold text-primary-700 hover:underline disabled:opacity-50"
+            >
+              Change file
+            </button>
           </p>
 
           {progress && (
@@ -152,23 +176,37 @@ export default function ImportLeadsModal({ open, onClose }) {
                 />
               </div>
               <p className="mt-1.5 text-xs font-semibold text-slate-600">
-                Importing {progress.done.toLocaleString('en-IN')} / {progress.total.toLocaleString('en-IN')}… please keep this window open.
+                Importing {progress.done.toLocaleString('en-IN')} /{' '}
+                {progress.total.toLocaleString('en-IN')}… please keep this window open.
               </p>
             </div>
           )}
-          {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm font-medium text-rose-700">{error}</p>}
-
+          {error && (
+            <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm font-medium text-rose-700">
+              {error}
+            </p>
+          )}
 
           <Field label="Sheets to import">
             <div className="flex flex-wrap gap-2">
               {parsed.sheets.map((s) => (
-                <label key={s.name} className={cn('flex items-center gap-2 rounded-xl border px-3 py-2 text-sm', chosen.includes(s.name) ? 'border-navy-900 bg-slate-50' : 'border-slate-200')}>
+                <label
+                  key={s.name}
+                  className={cn(
+                    'flex items-center gap-2 rounded-xl border px-3 py-2 text-sm',
+                    chosen.includes(s.name) ? 'border-navy-900 bg-slate-50' : 'border-slate-200',
+                  )}
+                >
                   <input
                     type="checkbox"
                     className="h-4 w-4 accent-emerald-700"
                     checked={chosen.includes(s.name)}
                     disabled={!s.rows.length}
-                    onChange={() => setChosen((c) => (c.includes(s.name) ? c.filter((x) => x !== s.name) : [...c, s.name]))}
+                    onChange={() =>
+                      setChosen((c) =>
+                        c.includes(s.name) ? c.filter((x) => x !== s.name) : [...c, s.name],
+                      )
+                    }
                   />
                   <span className="font-semibold">{s.name}</span>
                   <span className="text-slate-500">{s.rows.length} rows</span>
@@ -178,9 +216,15 @@ export default function ImportLeadsModal({ open, onClose }) {
           </Field>
 
           <Field label="Project for these leads">
-            <select className={fieldCls} value={project} onChange={(e) => setProject(e.target.value)}>
+            <select
+              className={fieldCls}
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+            >
               <option value="">Not set</option>
-              {PROJECTS.map((p) => <option key={p}>{p}</option>)}
+              {projectNames.map((p) => (
+                <option key={p}>{p}</option>
+              ))}
             </select>
           </Field>
 
@@ -198,7 +242,8 @@ export default function ImportLeadsModal({ open, onClose }) {
             ))}
           </div>
           <p className="text-xs text-slate-500">
-            Duplicates are matched by mobile number and skipped. Rows that have remarks are imported as “Contacted”, the rest as “New”.
+            Duplicates are matched by mobile number and skipped. Rows that have remarks are imported
+            as “Contacted”, the rest as “New”.
           </p>
 
           {summary.ready.length > 0 && (
@@ -220,19 +265,28 @@ export default function ImportLeadsModal({ open, onClose }) {
                       <td className="px-3 py-2 font-semibold">{r.name}</td>
                       <td className="px-3 py-2">{r.phone}</td>
                       <td className="px-3 py-2">{r.config}</td>
-                      <td className="whitespace-nowrap px-3 py-2">{r.priceMax ? `${inrShort(r.priceMin)} – ${inrShort(r.priceMax)}` : '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        {r.priceMax ? `${inrShort(r.priceMin)} – ${inrShort(r.priceMax)}` : '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {summary.ready.length > 6 && <p className="bg-slate-50 px-3 py-2 text-xs text-slate-500">…and {summary.ready.length - 6} more</p>}
+              {summary.ready.length > 6 && (
+                <p className="bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  …and {summary.ready.length - 6} more
+                </p>
+              )}
             </div>
           )}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Btn variant="outline" onClick={close} disabled={busy}>Cancel</Btn>
+            <Btn variant="outline" onClick={close} disabled={busy}>
+              Cancel
+            </Btn>
             <Btn onClick={doImport} disabled={busy || !summary.ready.length}>
-              <Upload className="h-4 w-4" /> {busy ? 'Importing…' : `Import ${summary.ready.length.toLocaleString('en-IN')} leads`}
+              <Upload className="h-4 w-4" />{' '}
+              {busy ? 'Importing…' : `Import ${summary.ready.length.toLocaleString('en-IN')} leads`}
             </Btn>
           </div>
         </div>

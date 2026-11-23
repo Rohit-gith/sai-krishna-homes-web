@@ -21,7 +21,7 @@ export default function MainLayout() {
       <TopBar />
       <Navbar />
       <main className="-mt-16 flex-1 md:-mt-[5.75rem]">
-        <Suspense fallback={<PageLoader />}>
+        <Suspense fallback={<PageLoader tall />}>
           <Outlet />
         </Suspense>
       </main>

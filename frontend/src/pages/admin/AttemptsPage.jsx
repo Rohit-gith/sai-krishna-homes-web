@@ -4,7 +4,7 @@ import { ArrowUpRight, ChevronDown, Search, X } from 'lucide-react';
 import { useCrmStore } from '@/features/admin/store/useCrmStore';
 import { ATTEMPT_OUTCOMES, ATTEMPT_TYPES, OUTCOME } from '@/features/admin/constants';
 import { Card, OutcomeBadge, StatusBadge, fieldCls } from '@/features/admin/components/ui';
-import { fmtDateTime } from '@/features/admin/utils';
+import { fmtDateTime, istSince } from '@/features/admin/utils';
 import { cn } from '@/utils/cn';
 
 const PERIODS = [
@@ -19,10 +19,7 @@ const sel = 'min-w-0 truncate px-2.5 text-sm sm:px-4 sm:text-base';
 
 const since = (period) => {
   if (!period) return '';
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  if (period !== 'today') d.setDate(d.getDate() - Number(period) + 1);
-  return d.toISOString();
+  return istSince(period === 'today' ? 1 : period); // India days
 };
 
 /** One attempt line (used inside a customer card and in the timeline). */

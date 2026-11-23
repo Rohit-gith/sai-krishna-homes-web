@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Download, FileSpreadsheet, Plus, Search, Trash2, X } from 'lucide-react';
 import { useCrmStore } from '@/features/admin/store/useCrmStore';
-import { STATUSES, STATUS, OPEN_STATUSES, PROJECTS, SOURCES } from '@/features/admin/constants';
+import { STATUSES, STATUS, OPEN_STATUSES, SOURCES } from '@/features/admin/constants';
+import { useProjectNames } from '@/features/admin/store/useCrmStore';
 import { Btn, Card, StatusBadge, fieldCls } from '@/features/admin/components/ui';
 import LeadFormModal from '@/features/admin/components/LeadFormModal';
 import CommitDealModal from '@/features/admin/components/CommitDealModal';
@@ -10,9 +11,11 @@ import ImportLeadsModal from '@/features/admin/components/ImportLeadsModal';
 import { downloadCsv, fmtDate, inrShort, isOverdue } from '@/features/admin/utils';
 import { useUiStore } from '@/store/useUiStore';
 import { cn } from '@/utils/cn';
+import { useCan } from '@/features/admin/access';
 
 const PAGE = 100;
 const NO_PROJECT = '__none__'; // filter value for leads without a project (e.g. imported with "Not set")
+const UNASSIGNED = '__unassigned__'; // filter value for leads not given to anyone
 
 /** Empty result: say why, and offer the one click that fixes it. */
 function NoMatch({ filtered, onClear }) {
@@ -49,10 +52,25 @@ const valueLabel = (l) =>
         ? inrShort(l.budget)
         : '—';
 
+/** Whose lead it is: assigned to someone, else who created it. */
+function Owner({ lead }) {
+  const who = lead.assignedTo || lead.createdBy;
+  if (!who) return null;
+  return (
+    <span className="mt-0.5 block text-[11px] font-semibold text-primary-700">
+      {lead.assignedTo ? '→ ' : 'by '}
+      {who.name}
+    </span>
+  );
+}
+
 /** Status picker used on each row: open stages change instantly, Won/Lost open the commit dialog. */
 function StatusSelect({ lead, onClose }) {
   const setStatus = useCrmStore((s) => s.setStatus);
-  if (lead.closed) return <StatusBadge status={lead.status} />;
+  const allowed = useCan();
+  // without "Edit leads" the status is shown, not changed; Won/Lost need "Close deals"
+  if (lead.closed || !allowed('leads.edit')) return <StatusBadge status={lead.status} />;
+  const closeOk = allowed('deals.close');
   return (
     <select
       aria-label={`Status of ${lead.id}`}
@@ -68,7 +86,7 @@ function StatusSelect({ lead, onClose }) {
         STATUS[lead.status].badge,
       )}
     >
-      {STATUSES.map((s) => (
+      {STATUSES.filter((s) => closeOk || !['won', 'lost'].includes(s.id)).map((s) => (
         <option key={s.id} value={s.id}>
           {s.id === 'won' || s.id === 'lost' ? `${s.label} (commit…)` : s.label}
         </option>
@@ -81,13 +99,21 @@ export default function LeadsPage() {
   const leads = useCrmStore((s) => s.leads);
   const setStatus = useCrmStore((s) => s.setStatus);
   const deleteLeads = useCrmStore((s) => s.deleteLeads);
+  const assignLeads = useCrmStore((s) => s.assignLeads);
+  const logExport = useCrmStore((s) => s.logExport);
+  const assignees = useCrmStore((s) => s.assignees);
+  const loadAssignees = useCrmStore((s) => s.loadAssignees);
+  const allowed = useCan();
+  const projectNames = useProjectNames();
   const toast = useUiStore((s) => s.showToast);
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const manager = allowed('leads.restore');
 
   const [q, setQ] = useState('');
   const [project, setProject] = useState('');
   const [source, setSource] = useState('');
+  const [person, setPerson] = useState(''); // team member credited with the lead, or UNASSIGNED
   const status = params.get('status') || '';
   const [selected, setSelected] = useState([]);
   const [adding, setAdding] = useState(false);
@@ -104,11 +130,31 @@ export default function LeadsPage() {
         (!status || l.status === status) &&
         (!project || (project === NO_PROJECT ? !l.project : l.project === project)) &&
         (!source || l.source === source) &&
+        (!person ||
+          (person === UNASSIGNED
+            ? !l.assignedTo
+            : l.assignedTo?.email === person ||
+              (!l.assignedTo && l.createdBy?.email === person))) &&
         (!t ||
           [l.id, l.name, l.phone, l.email].some((v) => v?.toLowerCase().includes(t)) ||
           (digits.length >= 4 && l.phone?.includes(digits))),
     );
-  }, [leads, q, status, project, source]);
+  }, [leads, q, status, project, source, person]);
+
+  // team members who created or were given leads (for the 'Team member' filter)
+  const people = useMemo(() => {
+    const m = new Map();
+    for (const l of leads)
+      for (const p of [l.assignedTo, l.createdBy])
+        if (p?.email && !m.has(p.email)) m.set(p.email, p.name);
+    return [...m]
+      .map(([email, name]) => ({ email, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [leads]);
+  useEffect(() => {
+    if (allowed('leads.assign') && !assignees.length) loadAssignees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // how many leads each dropdown option would show, so an empty choice is obvious before picking it
   const projectCounts = useMemo(() => {
@@ -130,16 +176,24 @@ export default function LeadsPage() {
       () => setProject(''),
     ],
     source && ['Source', source, () => setSource('')],
+    person && [
+      'Team member',
+      person === UNASSIGNED
+        ? 'Not assigned'
+        : people.find((p) => p.email === person)?.name || person,
+      () => setPerson(''),
+    ],
     q.trim() && ['Search', `“${q.trim()}”`, () => setQ('')],
   ].filter(Boolean);
   const clearFilters = () => {
     setQ('');
     setProject('');
     setSource('');
+    setPerson('');
     setStatusFilter('');
   };
 
-  useEffect(() => setLimit(PAGE), [q, status, project, source]);
+  useEffect(() => setLimit(PAGE), [q, status, project, source, person]);
   const visible = rows.slice(0, limit);
 
   const allSelected = visible.length > 0 && visible.every((r) => selected.includes(r.id));
@@ -160,10 +214,25 @@ export default function LeadsPage() {
     );
     setSelected([]);
   };
+  const bulkAssign = async (to) => {
+    const n = await assignLeads(selected, to || null);
+    if (n == null) return;
+    toast(
+      to
+        ? `${n} lead(s) assigned to ${assignees.find((a) => a.email === to)?.name}`
+        : `${n} lead(s) unassigned`,
+    );
+    setSelected([]);
+  };
   const bulkDelete = async () => {
-    if (!window.confirm(`Delete ${selected.length} lead(s)? This cannot be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete ${selected.length} lead(s)? They go to the recycle bin and the owner can restore them.`,
+      )
+    )
+      return;
     if ((await deleteLeads(selected)) == null) return;
-    toast(`${selected.length} lead(s) deleted`);
+    toast(`${selected.length} lead(s) moved to the recycle bin`);
     setSelected([]);
   };
   const exportCsv = () => {
@@ -184,6 +253,8 @@ export default function LeadsPage() {
         'Attempts',
         'Next follow-up',
         'Created',
+        'Created by',
+        'Assigned to',
         'Notes',
       ],
       ...list.map((l) => [
@@ -201,9 +272,16 @@ export default function LeadsPage() {
         l.attempts.length,
         fmtDate(l.nextFollowUp),
         fmtDate(l.createdAt),
+        l.createdBy?.name || '',
+        l.assignedTo?.name || '',
         l.notes,
       ]),
     ]);
+    // recorded in the activity log: who exported, when, how many, with which filters
+    logExport(
+      list.length,
+      selected.length ? 'selected leads' : activeFilters.map(([k, v]) => `${k}: ${v}`).join(', '),
+    );
   };
 
   const counts = Object.fromEntries(
@@ -220,15 +298,29 @@ export default function LeadsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Btn variant="outline" onClick={() => setImporting(true)}>
-            <FileSpreadsheet className="h-4 w-4" /> Import
-          </Btn>
-          <Btn variant="outline" onClick={exportCsv}>
-            <Download className="h-4 w-4" /> Export
-          </Btn>
-          <Btn onClick={() => setAdding(true)}>
-            <Plus className="h-4 w-4" /> Add new lead
-          </Btn>
+          {manager && (
+            <Link
+              to="/admin/recycle-bin"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-navy-900 hover:border-navy-900"
+            >
+              <Trash2 className="h-4 w-4" /> Recycle bin
+            </Link>
+          )}
+          {allowed('leads.import') && (
+            <Btn variant="outline" onClick={() => setImporting(true)}>
+              <FileSpreadsheet className="h-4 w-4" /> Import
+            </Btn>
+          )}
+          {allowed('leads.export') && (
+            <Btn variant="outline" onClick={exportCsv}>
+              <Download className="h-4 w-4" /> Export
+            </Btn>
+          )}
+          {allowed('leads.create') && (
+            <Btn onClick={() => setAdding(true)}>
+              <Plus className="h-4 w-4" /> Add new lead
+            </Btn>
+          )}
         </div>
       </div>
 
@@ -261,7 +353,7 @@ export default function LeadsPage() {
       </div>
 
       {/* Filters */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_15.5rem_13rem]">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_15.5rem_13rem_13rem]">
         <label className="relative">
           <span className="sr-only">Search</span>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -279,7 +371,7 @@ export default function LeadsPage() {
           aria-label="Project"
         >
           <option value="">All projects ({leads.length})</option>
-          {PROJECTS.map((p) => (
+          {projectNames.map((p) => (
             <option key={p} value={p}>
               {p} ({projectCounts[p] || 0})
             </option>
@@ -298,6 +390,20 @@ export default function LeadsPage() {
               {p} ({sourceCounts[p] || 0})
             </option>
           ))}
+        </select>
+        <select
+          className={fieldCls}
+          value={person}
+          onChange={(e) => setPerson(e.target.value)}
+          aria-label="Team member"
+        >
+          <option value="">All team members</option>
+          {people.map((p) => (
+            <option key={p.email} value={p.email}>
+              {p.name}
+            </option>
+          ))}
+          <option value={UNASSIGNED}>Not assigned</option>
         </select>
       </div>
 
@@ -375,6 +481,7 @@ export default function LeadsPage() {
                   <span className="text-xs text-slate-500">
                     {l.id} · {l.phone} · {l.source}
                   </span>
+                  <Owner lead={l} />
                 </td>
                 <td className="px-3 py-3 text-slate-600">
                   {l.project || '—'}
@@ -437,6 +544,7 @@ export default function LeadsPage() {
                 <span className="block text-xs text-slate-500">
                   {l.id} · {l.phone}
                 </span>
+                <Owner lead={l} />
                 <span className="mt-1 block text-xs text-slate-500">
                   {[l.project, l.config].filter(Boolean).join(' · ') || '—'}
                 </span>
@@ -459,36 +567,61 @@ export default function LeadsPage() {
         <div className="fixed inset-x-3 bottom-3 z-40 rounded-2xl bg-navy-950 p-3 text-white shadow-2xl lg:left-[calc(16rem+1.5rem)] lg:right-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="px-2 text-sm font-semibold">{selected.length} selected</span>
-            <select
-              aria-label="Bulk change status"
-              defaultValue=""
-              onChange={(e) => {
-                if (e.target.value) bulkStatus(e.target.value);
-                e.target.value = '';
-              }}
-              className="rounded-xl border-0 bg-white/10 px-3 py-2 text-sm font-semibold text-white focus:ring-2 focus:ring-primary-400 [&>option]:text-navy-950"
-            >
-              <option value="">Change status…</option>
-              {STATUSES.filter((s) => OPEN_STATUSES.includes(s.id)).map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={exportCsv}
-              className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
-            >
-              <Download className="h-4 w-4" /> Export
-            </button>
-            <button
-              type="button"
-              onClick={bulkDelete}
-              className="flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold hover:bg-rose-700"
-            >
-              <Trash2 className="h-4 w-4" /> Delete
-            </button>
+            {allowed('leads.assign') && (
+              <select
+                aria-label="Assign selected leads"
+                defaultValue="__pick"
+                onChange={(e) => {
+                  if (e.target.value !== '__pick') bulkAssign(e.target.value);
+                  e.target.value = '__pick';
+                }}
+                className="rounded-xl border-0 bg-white/10 px-3 py-2 text-sm font-semibold text-white focus:ring-2 focus:ring-primary-400 [&>option]:text-navy-950"
+              >
+                <option value="__pick">Assign to…</option>
+                {assignees.map((a) => (
+                  <option key={a.email} value={a.email}>
+                    {a.name}
+                  </option>
+                ))}
+                <option value="">Remove assignment</option>
+              </select>
+            )}
+            {allowed('leads.edit') && (
+              <select
+                aria-label="Bulk change status"
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) bulkStatus(e.target.value);
+                  e.target.value = '';
+                }}
+                className="rounded-xl border-0 bg-white/10 px-3 py-2 text-sm font-semibold text-white focus:ring-2 focus:ring-primary-400 [&>option]:text-navy-950"
+              >
+                <option value="">Change status…</option>
+                {STATUSES.filter((s) => OPEN_STATUSES.includes(s.id)).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {allowed('leads.export') && (
+              <button
+                type="button"
+                onClick={exportCsv}
+                className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
+              >
+                <Download className="h-4 w-4" /> Export
+              </button>
+            )}
+            {allowed('leads.delete') && (
+              <button
+                type="button"
+                onClick={bulkDelete}
+                className="flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold hover:bg-rose-700"
+              >
+                <Trash2 className="h-4 w-4" /> Delete
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setSelected([])}

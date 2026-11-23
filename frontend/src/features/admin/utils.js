@@ -7,15 +7,43 @@ export const inrShort = (n) => {
   return inr(v);
 };
 
+// Dates and times always show in India time, wherever the person opening the CRM is
+// (a partner travelling abroad sees the same "20 Nov, 04:18 pm" as the office).
+const IST = 'Asia/Kolkata';
+const dayIST = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: IST }); // "2026-11-20"
+
 export const fmtDate = (iso) =>
-  iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+  iso
+    ? new Date(iso).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: IST,
+      })
+    : '—';
 export const fmtDateTime = (iso) =>
   iso
-    ? new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+    ? new Date(iso).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: IST,
+      })
     : '—';
 
-export const isToday = (iso) => !!iso && new Date(iso).toDateString() === new Date().toDateString();
-export const isOverdue = (iso) => !!iso && new Date(iso) < new Date(new Date().toDateString());
+/** Start of an India day ("2026-11-20") / end of it, as ISO. */
+export const istDayStart = (ymd) => new Date(`${ymd}T00:00:00+05:30`).toISOString();
+export const istDayEnd = (ymd) => new Date(`${ymd}T23:59:59.999+05:30`).toISOString();
+/** Midnight in India, `days` days back counting today as day 1 (1 = today, 7 = last 7 days). */
+export const istSince = (days) => {
+  const start = new Date(istDayStart(dayIST(Date.now())));
+  start.setUTCDate(start.getUTCDate() - (Number(days) - 1));
+  return start.toISOString();
+};
+
+export const isToday = (iso) => !!iso && dayIST(iso) === dayIST(Date.now());
+export const isOverdue = (iso) => !!iso && dayIST(iso) < dayIST(Date.now());
 
 /** "SKH-0001" style lead IDs. */
 export const leadId = (n) => `SKH-${String(n).padStart(4, '0')}`;

@@ -55,10 +55,12 @@ describe('public enquiries', () => {
     const r = await call('/api/enquiries', { method: 'POST', body: enquiry({ phone: '12345' }), auth: false });
     assert.equal(r.status, 400);
   });
-  test('honeypot: bots get 201 but nothing is stored', async () => {
-    const r = await call('/api/enquiries', { method: 'POST', body: enquiry({ name: 'Bot Bot', website: 'spam.com' }), auth: false });
+  test('anti-bot field: the enquiry is still kept (autofill can fill it), tagged as possible spam', async () => {
+    const r = await call('/api/enquiries', { method: 'POST', body: enquiry({ name: 'Bot Bot', website: 'spam.com' }), auth: false, headers: { 'X-Forwarded-For': '10.0.0.66' } });
     assert.equal(r.status, 201);
-    assert.equal(await (await getDb()).collection('enquiries').countDocuments({ name: 'Bot Bot' }), 0);
+    const saved = await (await getDb()).collection('enquiries').findOne({ name: 'Bot Bot' });
+    assert.equal(saved.spam, true);
+    assert.equal(saved.website, undefined);
   });
   test('blocks other websites (Origin check)', async () => {
     const r = await call('/api/enquiries', { method: 'POST', body: enquiry(), auth: false, origin: 'https://evil.example' });
@@ -190,10 +192,690 @@ describe('activity log', () => {
     // earlier logout in the CRM suite was recorded too
     assert.ok(list.some((a) => a.type === 'logout'));
   });
+  test('each browser has its own device ID; the first login from it is tagged "new device"', async () => {
+    const as = (id) => ({ 'X-Device-Id': id, 'X-Forwarded-For': '10.9.9.10' });
+    const login = (id) =>
+      call('/api/auth/login', { method: 'POST', body: { email: 'admin@test.in', password: 'Secret12345' }, auth: false, headers: as(id) });
+    const latest = async () => (await call('/api/activity?type=login')).body[0];
+    cookie = (await login('a1b2c3d4e5f6')).set.split(';')[0];
+    let a = await latest();
+    assert.equal(a.deviceId, 'a1b2c3d4e5f6');
+    assert.equal(a.newDevice, true);
+    cookie = (await login('a1b2c3d4e5f6')).set.split(';')[0]; // same browser again: not new
+    a = await latest();
+    assert.equal(a.newDevice, undefined);
+    cookie = (await login('0000ffff1111')).set.split(';')[0]; // phone on the same WiFi: same IP, new device
+    a = await latest();
+    assert.equal(a.deviceId, '0000ffff1111');
+    assert.equal(a.ip, '10.9.9.10');
+    assert.equal(a.newDevice, true);
+    cookie = (await login('<script>bad')).set.split(';')[0]; // junk IDs are ignored
+    a = await latest();
+    assert.equal(a.deviceId, undefined);
+    assert.equal(a.newDevice, undefined);
+  });
   test('filter by type, and login is required', async () => {
     const failed = (await call('/api/activity?type=login_failed')).body;
     assert.ok(failed.length >= 1 && failed.every((a) => a.type === 'login_failed'));
     assert.equal((await call('/api/activity?type=nonsense')).status, 400);
     assert.equal((await call('/api/activity', { auth: false })).status, 401);
+  });
+});
+
+describe('team: roles, permissions, active/inactive, passwords (Phase 1)', () => {
+  const login = async (email, password) => {
+    const r = await call('/api/auth/login', { method: 'POST', body: { email, password }, auth: false });
+    return { status: r.status, body: r.body, ck: r.set ? r.set.split(';')[0] : '' };
+  };
+  const as = async (ck, path, opts = {}) => {
+    const keep = cookie;
+    cookie = ck;
+    try {
+      return await call(path, opts);
+    } finally {
+      cookie = keep;
+    }
+  };
+  let owner, fid, sales, salesId, visitId, ownerId;
+
+  test('setup: owner + Fidelsya superowner', async () => {
+    const db = await getDb();
+    await db.collection('admins').updateOne({ email: 'admin@test.in' }, { $set: { role: 'owner' } });
+    await db.collection('admins').insertOne({ email: 'fid@fidelsya.test', name: 'Fidelsya Support', role: 'superowner', active: true, passwordHash: await bcrypt.hash('Fidelsya12345', 4) });
+    owner = (await login('admin@test.in', 'Secret12345')).ck;
+    fid = (await login('fid@fidelsya.test', 'Fidelsya12345')).ck;
+    assert.equal((await as(owner, '/api/auth/me')).body.role, 'owner');
+    const meta = (await as(owner, '/api/users/meta')).body;
+    assert.deepEqual(meta.roles.map((x) => x.id), ['owner', 'management', 'sales', 'site_visit']); // an owner can add a co-owner
+    assert.ok(meta.permissions.length >= 10);
+    assert.deepEqual((await as(fid, '/api/users/meta')).body.roles.map((x) => x.id), ['owner', 'management', 'sales', 'site_visit']);
+  });
+
+  test('owner creates staff; history + activity recorded', async () => {
+    const s = await as(owner, '/api/users', { method: 'POST', body: { name: 'Sam Sales', email: 'sam@test.in', phone: '9876500011', role: 'sales', password: 'SamSales123' } });
+    assert.equal(s.status, 201);
+    assert.deepEqual(s.body.permissions, ['leads.create', 'leads.edit', 'attempts.log', 'deals.close', 'enquiries.view']);
+    assert.equal(s.body.createdBy.email, 'admin@test.in');
+    assert.equal(s.body.history[0].action, 'created');
+    assert.equal(s.body.passwordHash, undefined);
+    salesId = s.body.id;
+    const v = await as(owner, '/api/users', { method: 'POST', body: { name: 'Vic Visit', email: 'vic@test.in', role: 'site_visit', password: 'VicVisit123', permissions: ['visits.log'] } });
+    visitId = v.body.id;
+    assert.equal((await as(owner, '/api/users', { method: 'POST', body: { name: 'Dup', email: 'SAM@test.in', role: 'sales', password: 'SamSales123' } })).status, 409);
+    assert.equal((await as(owner, '/api/users', { method: 'POST', body: { name: 'Weak', email: 'w@test.in', role: 'sales', password: 'short' } })).status, 400);
+    const log = (await as(owner, '/api/activity?type=admin_created')).body.find((a) => a.target?.email === 'sam@test.in');
+    assert.equal(log.email, 'admin@test.in');
+  });
+
+  test('owner never sees Fidelsya; Fidelsya sees everyone', async () => {
+    const list = (await as(owner, '/api/users')).body;
+    assert.ok(!list.some((u) => u.email === 'fid@fidelsya.test'));
+    ownerId = list.find((u) => u.email === 'admin@test.in').id;
+    const fidUser = (await as(fid, '/api/users')).body.find((u) => u.email === 'fid@fidelsya.test');
+    assert.ok(fidUser);
+    assert.equal((await as(owner, `/api/users/${fidUser.id}`)).status, 404);
+    assert.equal((await as(owner, `/api/users/${fidUser.id}/status`, { method: 'PATCH', body: { active: false } })).status, 404);
+  });
+
+  test('sales: only own leads, only allowed actions; assignment credits them', async () => {
+    sales = (await login('sam@test.in', 'SamSales123')).ck;
+    assert.equal((await as(sales, '/api/auth/me')).body.role, 'sales');
+    assert.equal((await as(sales, '/api/users')).status, 403);
+    assert.equal((await as(sales, '/api/activity')).status, 403);
+    assert.equal((await as(sales, '/api/enquiries')).status, 200); // website enquiries: shown to staff by default
+    const ownerLead = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Owner Lead', phone: '9123400001' } })).body;
+    const mine = await as(sales, '/api/leads', { method: 'POST', body: { name: 'Sam Lead', phone: '9123400002' } });
+    assert.equal(mine.status, 201);
+    assert.equal(mine.body.createdBy.email, 'sam@test.in');
+    const seen = (await as(sales, '/api/leads')).body.map((l) => l.id);
+    assert.ok(seen.includes(mine.body.id) && !seen.includes(ownerLead.id));
+    assert.equal((await as(sales, `/api/leads/${ownerLead.id}`, { method: 'PATCH', body: { notes: 'x' } })).status, 404);
+    assert.equal((await as(sales, '/api/leads/delete', { method: 'POST', body: { ids: [mine.body.id] } })).status, 403);
+    assert.equal((await as(sales, '/api/leads/import', { method: 'POST', body: { drafts: [{ name: 'A', phone: '9000000999' }] } })).status, 403);
+    assert.equal((await as(sales, '/api/leads/exported', { method: 'POST', body: { count: 1 } })).status, 403);
+    const a = await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [ownerLead.id], to: 'sam@test.in' } });
+    assert.equal(a.body[0].assignedTo.email, 'sam@test.in');
+    assert.match(a.body[0].history[0].text, /Assigned to Sam Sales/);
+    assert.ok((await as(sales, '/api/leads')).body.some((l) => l.id === ownerLead.id));
+    assert.equal((await as(owner, '/api/activity?type=lead_assigned')).body[0].target.email, 'sam@test.in');
+    assert.equal((await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [ownerLead.id], to: 'vic@test.in' } })).status, 400);
+    assert.equal((await as(owner, '/api/leads/exported', { method: 'POST', body: { count: 5, filters: 'Project: Panchawati' } })).status, 200);
+  });
+
+  test('permission change applies at once and is recorded (who, what added/removed)', async () => {
+    const before = (await as(sales, '/api/leads')).body.length;
+    const u = await as(owner, `/api/users/${salesId}`, { method: 'PATCH', body: { permissions: ['leads.view_all', 'leads.create'], note: 'Promoted' } });
+    assert.deepEqual(u.body.history[0].changes.permissions, { added: ['leads.view_all'], removed: ['leads.edit', 'attempts.log', 'deals.close', 'enquiries.view'] });
+    assert.ok((await as(sales, '/api/leads')).body.length > before);
+    assert.equal((await as(sales, '/api/enquiries')).status, 403); // the owner took enquiries away
+    const log = (await as(owner, '/api/activity?type=user_updated')).body[0];
+    assert.equal(log.target.email, 'sam@test.in');
+    assert.equal(log.note, 'Promoted');
+  });
+
+  test('inactive: logged out at once, cannot log in; reactivate works', async () => {
+    const d = await as(owner, `/api/users/${salesId}/status`, { method: 'PATCH', body: { active: false, note: 'On leave' } });
+    assert.equal(d.body.active, false);
+    assert.equal(d.body.history[0].action, 'deactivated');
+    const kicked = await as(sales, '/api/leads');
+    assert.equal(kicked.status, 401);
+    assert.match(kicked.body.error, /deactivated/);
+    assert.equal((await login('sam@test.in', 'SamSales123')).status, 403);
+    assert.equal((await login('sam@test.in', 'nope')).status, 401);
+    assert.equal((await as(owner, `/api/users/${salesId}/status`, { method: 'PATCH', body: { active: true } })).body.active, true);
+    sales = (await login('sam@test.in', 'SamSales123')).ck;
+    assert.equal((await as(sales, '/api/auth/me')).status, 200);
+    assert.equal((await as(owner, `/api/users/${ownerId}/status`, { method: 'PATCH', body: { active: false } })).status, 400);
+  });
+
+  test('password reset by owner logs the person out; new password works', async () => {
+    assert.equal((await as(owner, `/api/users/${salesId}/password`, { method: 'POST', body: { password: 'weak' } })).status, 400);
+    assert.equal((await as(owner, `/api/users/${salesId}/password`, { method: 'POST', body: { password: 'NewSales456', note: 'Forgot it' } })).status, 200);
+    assert.equal((await as(sales, '/api/auth/me')).status, 401);
+    assert.equal((await login('sam@test.in', 'SamSales123')).status, 401);
+    sales = (await login('sam@test.in', 'NewSales456')).ck;
+    assert.equal((await as(sales, '/api/auth/me')).status, 200);
+    assert.equal((await as(owner, '/api/activity?type=password_reset')).body[0].target.email, 'sam@test.in');
+  });
+
+  test('owner cannot manage owners; Fidelsya can reset the owner and stays hidden', async () => {
+    assert.equal((await as(owner, `/api/users/${ownerId}`, { method: 'PATCH', body: { name: 'Hack' } })).status, 403);
+    assert.equal((await as(fid, `/api/users/${ownerId}/password`, { method: 'POST', body: { password: 'OwnerNew789' } })).status, 200);
+    assert.equal((await as(owner, '/api/auth/me')).status, 401);
+    owner = (await login('admin@test.in', 'OwnerNew789')).ck;
+    const ownerView = (await as(owner, '/api/activity?limit=2000')).body;
+    assert.ok(!ownerView.some((a) => a.email === 'fid@fidelsya.test'));
+    // nothing Fidelsya did from the command line (scripts) reaches the owner either, in any form
+    const db = await getDb();
+    await db.collection('activity').insertMany([
+      { at: new Date().toISOString(), type: 'admin_created', email: 'script', name: 'Fidelsya (create-admin script)', target: { email: 'x@test.in', name: 'X' } },
+      { at: new Date().toISOString(), type: 'admin_created', email: 'admin@test.in', name: 'Test Admin', by: 'Fidelsya (create-admin script)' },
+    ]);
+    const again = JSON.stringify((await as(owner, '/api/activity?limit=2000')).body);
+    assert.ok(!/fidelsya|"script"/i.test(again));
+    assert.match(JSON.stringify((await as(fid, '/api/activity?limit=2000')).body), /create-admin script/);
+    assert.ok((await as(fid, '/api/activity?limit=2000')).body.some((a) => a.email === 'fid@fidelsya.test' && a.type === 'password_reset'));
+  });
+
+  test('change my own password: needs the current one, keeps me in, logs other devices out', async () => {
+    const other = (await login('vic@test.in', 'VicVisit123')).ck;
+    const mine = (await login('vic@test.in', 'VicVisit123')).ck;
+    assert.equal((await as(mine, '/api/auth/change-password', { method: 'POST', body: { currentPassword: 'wrong', newPassword: 'VicNewPass1' } })).status, 400);
+    const ok = await as(mine, '/api/auth/change-password', { method: 'POST', body: { currentPassword: 'VicVisit123', newPassword: 'VicNewPass1' } });
+    assert.equal(ok.status, 200);
+    assert.equal((await as(ok.set.split(';')[0], '/api/auth/me')).status, 200);
+    assert.equal((await as(other, '/api/auth/me')).status, 401);
+    assert.equal((await as(owner, `/api/users/${visitId}`)).body.history[0].action, 'password_changed');
+  });
+
+  /* ---------------- Phase 4: site visits ---------------- */
+  let vic, visit1;
+  test('site visit executive records a visit; it links to the lead and notes its history', async () => {
+    vic = (await login('vic@test.in', 'VicNewPass1')).ck;
+    const lead = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Visit Customer', phone: '9555000001' } })).body;
+    const v = await as(vic, '/api/visits', {
+      method: 'POST',
+      body: { customerName: 'Visit Customer', phone: '9555000001', project: 'Panchawati Residency', config: '2 BHK', people: 3, rating: 5, feedback: 'Loved the pool', outcome: 'booking' },
+    });
+    assert.equal(v.status, 201);
+    assert.equal(v.body.id, 'VIS-0001');
+    assert.equal(v.body.satisfaction, 'satisfied');
+    assert.equal(v.body.guide.email, 'vic@test.in');
+    assert.equal(v.body.leadId, lead.id);
+    visit1 = v.body;
+    const after = (await as(owner, '/api/leads')).body.find((l) => l.id === lead.id);
+    assert.equal(after.status, 'visit'); // new → site visit
+    assert.match(after.history[0].text, /Site visit VIS-0001 by Vic Visit · ★★★★★/);
+    // no lead with that number → still saved, just not linked
+    const n = await as(vic, '/api/visits', { method: 'POST', body: { customerName: 'Walk In', phone: '9555000002', rating: 2, feedback: 'Too far', outcome: 'not_interested' } });
+    assert.equal(n.body.leadId, null);
+    assert.equal(n.body.satisfaction, 'not_satisfied');
+    // typing a known mobile fills the form, even though Vic cannot see the lead list
+    const look = (await as(vic, '/api/visits/lookup?phone=9555000001')).body;
+    assert.equal(look.lead.name, 'Visit Customer');
+    assert.equal(look.previousVisits, 1);
+    assert.deepEqual(Object.keys(look.lead).sort(), ['config', 'id', 'name', 'project']); // nothing more
+    assert.equal((await as(vic, '/api/visits/lookup?phone=95550')).status, 400); // only a full number
+    assert.equal((await as(vic, '/api/visits/lookup?phone=9555000099')).body.lead, null);
+    assert.equal((await as(sales, '/api/visits/lookup?phone=9555000001')).status, 403);
+  });
+
+  test('visit validation, future dates, and who can record', async () => {
+    assert.equal((await as(vic, '/api/visits', { method: 'POST', body: { customerName: 'X', phone: '123', rating: 4 } })).status, 400);
+    assert.equal((await as(vic, '/api/visits', { method: 'POST', body: { customerName: 'Xy', phone: '9555000003', rating: 9 } })).status, 400);
+    const future = new Date(Date.now() + 3 * 864e5).toISOString();
+    assert.equal((await as(vic, '/api/visits', { method: 'POST', body: { customerName: 'Xy', phone: '9555000003', rating: 4, at: future } })).status, 400);
+    // a visit executive cannot record for someone else
+    assert.equal((await as(vic, '/api/visits', { method: 'POST', body: { customerName: 'Xy', phone: '9555000003', rating: 4, guideEmail: 'sam@test.in' } })).status, 403);
+    // sales without visits.log cannot record or list visits
+    assert.equal((await as(sales, '/api/visits')).status, 403);
+    // the owner can record a visit on behalf of an executive, with a past date
+    const past = new Date(Date.now() - 40 * 864e5).toISOString();
+    const o = await as(owner, '/api/visits', { method: 'POST', body: { customerName: 'Old Visit', phone: '9555000004', rating: 3, guideEmail: 'vic@test.in', at: past, outcome: 'follow_up' } });
+    assert.equal(o.status, 201);
+    assert.equal(o.body.guide.email, 'vic@test.in');
+    assert.equal(o.body.createdBy.email, 'admin@test.in');
+    assert.equal(o.body.satisfaction, 'neutral');
+  });
+
+  test('who sees which visits; edit rules; delete is owner-only', async () => {
+    assert.equal((await as(vic, '/api/visits')).body.length, 3); // all three are Vic's
+    const other = await as(owner, '/api/visits', { method: 'POST', body: { customerName: 'Owner Shown', phone: '9555000005', rating: 4 } });
+    assert.equal((await as(vic, '/api/visits')).body.some((v) => v.id === other.body.id), false);
+    assert.equal((await as(owner, '/api/visits')).body.length, 4);
+    // filters
+    assert.equal((await as(owner, '/api/visits?guide=vic@test.in')).body.length, 3);
+    assert.equal((await as(owner, `/api/visits?leadId=${visit1.leadId}`)).body.length, 1);
+    const since = new Date(Date.now() - 7 * 864e5).toISOString();
+    assert.equal((await as(owner, `/api/visits?from=${encodeURIComponent(since)}`)).body.length, 3);
+    // edit own visit: rating change updates satisfaction + history
+    const e = await as(vic, `/api/visits/${visit1.id}`, { method: 'PATCH', body: { rating: 3, note: 'Customer called back, less sure' } });
+    assert.equal(e.body.satisfaction, 'neutral');
+    assert.match(e.body.history[0].text, /rating/);
+    assert.equal(e.body.history[0].changes.rating.from, 5);
+    // Vic cannot touch the owner's visit, and cannot delete
+    assert.equal((await as(vic, `/api/visits/${other.body.id}`, { method: 'PATCH', body: { rating: 1 } })).status, 404);
+    assert.equal((await as(vic, `/api/visits/${visit1.id}`, { method: 'DELETE', body: {} })).status, 403);
+    assert.equal((await as(owner, `/api/visits/${other.body.id}`, { method: 'DELETE', body: {} })).status, 200);
+    // the guides list
+    assert.deepEqual((await as(vic, '/api/visits/guides')).body.map((g) => g.email), ['vic@test.in']);
+    assert.ok((await as(owner, '/api/visits/guides')).body.some((g) => g.email === 'vic@test.in'));
+  });
+
+  /* ---------------- Phase 5: reports ---------------- */
+  test('reports: leads per sales person, won/lost in the period, visits per executive', async () => {
+    assert.equal((await as(sales, '/api/reports')).status, 403); // no reports.view
+    // Sam: one lead of his own + one assigned earlier; win one in this period
+    const samLead = (await as(owner, '/api/leads')).body.find((l) => l.name === 'Sam Lead');
+    await as(owner, `/api/leads/${samLead.id}/commit`, { method: 'POST', body: { result: 'won', value: 5000000, unit: 'A-1', note: '' } });
+    const rep = await as(owner, `/api/reports?from=${encodeURIComponent(new Date(Date.now() - 7 * 864e5).toISOString())}`);
+    assert.equal(rep.status, 200);
+    const sam = rep.body.sales.find((s) => s.email === 'sam@test.in');
+    assert.ok(sam.newLeads >= 2);
+    assert.equal(sam.won, 1);
+    assert.equal(sam.wonValue, 5000000);
+    assert.equal(sam.conversion, 100);
+    const vicRow = rep.body.visits.find((v) => v.email === 'vic@test.in');
+    assert.equal(vicRow.visits, 2); // the 40-day-old visit is outside "last 7 days"
+    assert.equal(vicRow.people, 4);
+    assert.equal(vicRow.satisfied, 0);
+    assert.equal(vicRow.neutral, 1);
+    assert.equal(vicRow.notSatisfied, 1);
+    assert.equal(vicRow.avgRating, 2.5);
+    assert.equal(vicRow.latestFeedback.length, 2);
+    // a longer period includes the older visit
+    const all = (await as(owner, `/api/reports?from=${encodeURIComponent(new Date(Date.now() - 90 * 864e5).toISOString())}`)).body;
+    assert.equal(all.visits.find((v) => v.email === 'vic@test.in').visits, 3);
+    // Fidelsya never appears in the client's report
+    assert.ok(!JSON.stringify(rep.body).includes('fid@fidelsya.test'));
+    // a staff member given "See team reports" can open it
+    await as(owner, `/api/users/${salesId}`, { method: 'PATCH', body: { permissions: ['reports.view'] } });
+    assert.equal((await as(sales, '/api/reports')).status, 200);
+    assert.equal((await as(owner, '/api/reports?from=2026-12-31T00:00:00.000Z&to=2026-01-01T00:00:00.000Z')).status, 400);
+  });
+
+  test('whatever Fidelsya does inside the CRM leaves no trace the client can see; Fidelsya sees it all', async () => {
+    // Fidelsya creates a lead, logs a call, changes status, assigns it, records visits, closes the deal
+    const l = (await as(fid, '/api/leads', { method: 'POST', body: { name: 'Support Made', phone: '9555000009' } })).body;
+    await as(fid, `/api/leads/${l.id}/attempts`, { method: 'POST', body: { type: 'Call', outcome: 'connected', note: 'checked data' } });
+    await as(fid, '/api/leads/status', { method: 'POST', body: { ids: [l.id], status: 'negotiation' } });
+    await as(fid, '/api/leads/assign', { method: 'POST', body: { ids: [l.id], to: 'sam@test.in' } });
+    await as(fid, `/api/leads/${l.id}/commit`, { method: 'POST', body: { result: 'won', value: 100, unit: '', note: '' } });
+    const own = await as(fid, '/api/visits', { method: 'POST', body: { customerName: 'Fid Shown', phone: '9555000010', rating: 4 } });
+    const forVic = await as(fid, '/api/visits', { method: 'POST', body: { customerName: 'For Vic', phone: '9555000009', rating: 5, guideEmail: 'vic@test.in' } });
+    // the client sees the business data, but no "who" and no history from Fidelsya
+    const ownerLead = (await as(owner, '/api/leads')).body.find((x) => x.id === l.id);
+    assert.ok(ownerLead, 'the lead itself is the client’s data');
+    assert.equal(ownerLead.createdBy, null);
+    assert.equal(ownerLead.attempts.length, 0);
+    assert.equal(ownerLead.history.length, 0);
+    assert.equal(ownerLead.assignedTo.email, 'sam@test.in');
+    assert.equal(ownerLead.assignedTo.by, null);
+    assert.equal(ownerLead.closed.by, undefined);
+    const ownerVisits = (await as(owner, '/api/visits')).body;
+    assert.ok(!ownerVisits.some((v) => v.id === own.body.id)); // Fidelsya showed this one itself: hidden
+    const v2 = ownerVisits.find((v) => v.id === forVic.body.id);
+    assert.equal(v2.createdBy, null);
+    assert.equal(v2.history.length, 0);
+    const everything = JSON.stringify([(await as(owner, '/api/leads')).body, ownerVisits, (await as(owner, '/api/reports')).body, (await as(owner, '/api/users')).body, (await as(owner, '/api/activity?limit=2000')).body]);
+    assert.ok(!/fidelsya|support team|"support"/i.test(everything), 'no trace of Fidelsya for the client');
+    // staff can't see it either
+    assert.ok(!/fidelsya|support team/i.test(JSON.stringify((await as(vic, '/api/visits')).body)));
+    // Fidelsya still sees every detail
+    const fidLead = (await as(fid, '/api/leads')).body.find((x) => x.id === l.id);
+    assert.equal(fidLead.createdBy.name, 'Support team');
+    assert.equal(fidLead.attempts.length, 1);
+    assert.ok(fidLead.history.length >= 4);
+    assert.ok((await as(fid, '/api/visits')).body.some((v) => v.id === own.body.id));
+    assert.ok((await as(fid, '/api/activity?limit=2000')).body.some((a) => a.email === 'fid@fidelsya.test'));
+  });
+
+  test('co-owner (partner / family): same powers as the owner, every action recorded under their name', async () => {
+    const c = await as(owner, '/api/users', { method: 'POST', body: { name: 'Owner Son', email: 'son@test.in', role: 'owner', password: 'OwnerSon123' } });
+    assert.equal(c.status, 201);
+    assert.equal(c.body.role, 'owner');
+    assert.deepEqual(c.body.permissions, []); // owners don't need ticks: they can do everything
+    const son = (await login('son@test.in', 'OwnerSon123')).ck;
+    // while the owner is away, the son runs the team
+    const staff = await as(son, '/api/users', { method: 'POST', body: { name: 'New Sales', email: 'new.sales@test.in', role: 'sales', password: 'NewSales123' } });
+    assert.equal(staff.status, 201);
+    assert.equal(staff.body.createdBy.name, 'Owner Son');
+    assert.equal((await as(son, `/api/users/${staff.body.id}/status`, { method: 'PATCH', body: { active: false, note: 'Trial over' } })).status, 200);
+    assert.equal((await as(son, `/api/users/${staff.body.id}/password`, { method: 'POST', body: { password: 'Another123x' } })).status, 200);
+    assert.equal((await as(son, '/api/leads')).status, 200);
+    assert.equal((await as(son, '/api/visits')).status, 200);
+    const rep = (await as(son, '/api/reports')).body;
+    assert.ok(rep.sales && rep.visits && rep.totals.status);
+    assert.equal(rep.totals.status.won + rep.totals.status.lost + rep.totals.status.open, rep.totals.newLeads);
+    // owners can't remove each other (only Fidelsya can) — nobody gets locked out
+    const list = (await as(son, '/api/users')).body;
+    const mainOwner = list.find((u) => u.email === 'admin@test.in');
+    assert.equal((await as(son, `/api/users/${mainOwner.id}/status`, { method: 'PATCH', body: { active: false } })).status, 403);
+    assert.equal((await as(son, `/api/users/${mainOwner.id}/password`, { method: 'POST', body: { password: 'Hijack12345' } })).status, 403);
+    // the owner sees exactly what the son did, with time
+    const log = (await as(owner, '/api/activity?email=son@test.in')).body;
+    const did = log.filter((a) => a.email === 'son@test.in').map((a) => a.type);
+    assert.ok(['admin_created', 'user_deactivated', 'password_reset', 'login'].every((t) => did.includes(t)));
+    assert.ok(log.every((a) => !Number.isNaN(Date.parse(a.at))));
+    // and staff still can't see reports or the team
+    assert.equal((await as(vic, '/api/reports')).status, 403);
+    assert.equal((await as(vic, '/api/users')).status, 403);
+  });
+
+  /* ---------------- projects ---------------- */
+  test('projects: the two website projects are built in and locked', async () => {
+    const list = (await as(owner, '/api/projects')).body;
+    assert.deepEqual(list.filter((p) => p.builtIn).map((p) => p.name).sort(), ['Panchawati Residency', 'Sai Krishna Residency']);
+    const pw = list.find((p) => p.name === 'Panchawati Residency');
+    assert.equal(typeof pw.leads, 'number'); // owners see usage counts
+    assert.equal((await as(owner, `/api/projects/${pw.id}`, { method: 'PATCH', body: { name: 'Hacked' } })).status, 403);
+    assert.equal((await as(owner, `/api/projects/${pw.id}`, { method: 'DELETE', body: {} })).status, 403);
+    assert.equal((await as(fid, `/api/projects/${pw.id}`, { method: 'DELETE', body: {} })).status, 403); // locked for everyone
+    // staff get the list (for dropdowns) but no counts and can't manage
+    const staffList = (await as(vic, '/api/projects')).body;
+    assert.equal(staffList.length >= 2, true);
+    assert.equal(staffList[0].leads, undefined);
+    assert.equal((await as(vic, '/api/projects', { method: 'POST', body: { name: 'Staff Project' } })).status, 403);
+  });
+
+  test('projects: add, fix a spelling (leads + visits follow), delete only when unused; all recorded', async () => {
+    const add = await as(owner, '/api/projects', { method: 'POST', body: { name: '  Green   Vally ', location: 'Khandagiri', rera: 'RP/19/2026/00001' } });
+    assert.equal(add.status, 201);
+    assert.equal(add.body.name, 'Green Vally');
+    assert.equal(add.body.createdBy.email, 'admin@test.in');
+    assert.equal((await as(owner, '/api/projects', { method: 'POST', body: { name: 'green vally' } })).status, 409); // no duplicates
+    assert.equal((await as(owner, '/api/projects', { method: 'POST', body: { name: 'G' } })).status, 400);
+    // a lead and a visit use the misspelt name
+    const lead = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'GV Buyer', phone: '9555000201', project: 'Green Vally' } })).body;
+    await as(vic, '/api/visits', { method: 'POST', body: { customerName: 'GV Buyer', phone: '9555000201', rating: 4, project: 'Green Vally' } });
+    // delete is refused while in use
+    const del = await as(owner, `/api/projects/${add.body.id}`, { method: 'DELETE', body: {} });
+    assert.equal(del.status, 409);
+    assert.equal(del.body.leads, 1);
+    assert.equal(del.body.visits, 1);
+    // fix the spelling → lead and visit move with it
+    const fix = await as(owner, `/api/projects/${add.body.id}`, { method: 'PATCH', body: { name: 'Green Valley', note: 'Spelling' } });
+    assert.equal(fix.status, 200);
+    assert.deepEqual(fix.body.history[0].changes.name, { from: 'Green Vally', to: 'Green Valley' });
+    assert.deepEqual(fix.body.history[0].moved, { leads: 1, visits: 1 });
+    assert.equal((await as(owner, '/api/leads')).body.find((l) => l.id === lead.id).project, 'Green Valley');
+    assert.ok((await as(owner, '/api/visits')).body.some((v) => v.project === 'Green Valley'));
+    assert.equal((await as(owner, `/api/projects/${add.body.id}`, { method: 'PATCH', body: { name: 'Panchawati Residency' } })).status, 409);
+    // the co-owner can manage projects too; an unused one can be deleted
+    const son = (await login('son@test.in', 'OwnerSon123')).ck;
+    const tmp = (await as(son, '/api/projects', { method: 'POST', body: { name: 'Typo Project' } })).body;
+    assert.equal((await as(son, `/api/projects/${tmp.id}`, { method: 'DELETE', body: {} })).status, 200);
+    assert.ok(!(await as(owner, '/api/projects')).body.some((p) => p.id === tmp.id));
+    // everything is in the activity log with who and when
+    const log = (await as(owner, '/api/activity?limit=2000')).body;
+    assert.ok(log.some((a) => a.type === 'project_created' && a.target.name === 'Green Vally' && a.email === 'admin@test.in'));
+    assert.ok(log.some((a) => a.type === 'project_updated' && /1 lead\(s\) and 1 visit\(s\) moved/.test(a.note)));
+    assert.ok(log.some((a) => a.type === 'project_deleted' && a.target.name === 'Typo Project' && a.email === 'son@test.in'));
+    // Fidelsya's project work stays invisible to the client
+    const fp = (await as(fid, '/api/projects', { method: 'POST', body: { name: 'Fid Project' } })).body;
+    const seen = (await as(owner, '/api/projects')).body.find((p) => p.id === fp.id);
+    assert.equal(seen.createdBy, null);
+    assert.equal(seen.history.length, 0);
+  });
+  /* ---------------- recycle bin + hand over ---------------- */
+  test('delete moves leads to the recycle bin; owner restores; only Fidelsya removes for good', async () => {
+    const a = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Bin Lead A', phone: '9555000301' } })).body;
+    const b = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Bin Lead B', phone: '9555000302' } })).body;
+    await as(owner, `/api/leads/${a.id}/attempts`, { method: 'POST', body: { type: 'Call', outcome: 'connected', note: 'keep me' } });
+    assert.equal((await as(owner, '/api/leads/delete', { method: 'POST', body: { ids: [a.id, b.id] } })).body.deleted, 2);
+    assert.ok(!(await as(owner, '/api/leads')).body.some((l) => [a.id, b.id].includes(l.id)));
+    const db = await getDb();
+    assert.equal(await db.collection('leads_trash').countDocuments({ id: { $in: [a.id, b.id] } }), 2); // still in the database
+    const bin = (await as(owner, '/api/leads/trash')).body;
+    const inBin = bin.find((l) => l.id === a.id);
+    assert.equal(inBin.deleted.by.email, 'admin@test.in');
+    assert.equal(inBin.attempts.length, 1); // nothing lost
+    // staff can't see or use the bin
+    assert.equal((await as(vic, '/api/leads/trash')).status, 403);
+    assert.equal((await as(vic, '/api/leads/trash/restore', { method: 'POST', body: { ids: [a.id] } })).status, 403);
+    // restore: back with its history + a line saying who restored it
+    const back = await as(owner, '/api/leads/trash/restore', { method: 'POST', body: { ids: [a.id] } });
+    assert.equal(back.status, 200);
+    const lead = (await as(owner, '/api/leads')).body.find((l) => l.id === a.id);
+    assert.ok(lead);
+    assert.equal(lead.attempts[0].note, 'keep me');
+    assert.match(lead.history[0].text, /Restored from the recycle bin by Test Admin/);
+    // the owner can't remove for good; Fidelsya can
+    assert.equal((await as(owner, '/api/leads/trash/purge', { method: 'POST', body: { ids: [b.id] } })).status, 403);
+    assert.equal((await as(fid, '/api/leads/trash/purge', { method: 'POST', body: { ids: [b.id] } })).body.purged, 1);
+    assert.equal(await db.collection('leads_trash').countDocuments({ id: b.id }), 0);
+    // Fidelsya's deletes never show in the client's bin
+    const c = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Bin Lead C', phone: '9555000303' } })).body;
+    await as(fid, '/api/leads/delete', { method: 'POST', body: { ids: [c.id] } });
+    assert.ok(!(await as(owner, '/api/leads/trash')).body.some((l) => l.id === c.id));
+    assert.ok((await as(fid, '/api/leads/trash')).body.some((l) => l.id === c.id && l.deleted.support));
+    // all recorded
+    const log = (await as(owner, '/api/activity?limit=2000')).body;
+    assert.ok(log.some((x) => x.type === 'leads_deleted' && x.note.includes(a.id)));
+    assert.ok(log.some((x) => x.type === 'leads_restored' && x.note.includes(a.id)));
+    assert.ok(!log.some((x) => x.type === 'leads_purged')); // Fidelsya's action: hidden from the client
+    assert.ok((await as(fid, '/api/activity?limit=2000')).body.some((x) => x.type === 'leads_purged'));
+  });
+
+  test('hand over: all open leads of a leaving person go to another; closed deals stay', async () => {
+    await as(owner, '/api/users', { method: 'POST', body: { name: 'Leaving Lal', email: 'lal@test.in', role: 'sales', password: 'LeavingLal123' } });
+    await as(owner, '/api/users', { method: 'POST', body: { name: 'Taking Tara', email: 'tara@test.in', role: 'sales', password: 'TakingTara123' } });
+    const lal = (await login('lal@test.in', 'LeavingLal123')).ck;
+    const o1 = (await as(lal, '/api/leads', { method: 'POST', body: { name: 'Lal Open 1', phone: '9555000311' } })).body;
+    const o2 = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Lal Open 2', phone: '9555000312' } })).body;
+    await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [o2.id], to: 'lal@test.in' } });
+    const w = (await as(lal, '/api/leads', { method: 'POST', body: { name: 'Lal Won', phone: '9555000313' } })).body;
+    await as(lal, `/api/leads/${w.id}/commit`, { method: 'POST', body: { result: 'won', value: 500, unit: '', note: '' } });
+    // only owners
+    assert.equal((await as(lal, '/api/leads/handover', { method: 'POST', body: { from: 'lal@test.in', to: 'tara@test.in' } })).status, 403);
+    assert.equal((await as(owner, '/api/leads/handover', { method: 'POST', body: { from: 'lal@test.in', to: 'vic@test.in' } })).status, 400); // site visit can't take leads
+    const h = await as(owner, '/api/leads/handover', { method: 'POST', body: { from: 'lal@test.in', to: 'tara@test.in', note: 'Left the company' } });
+    assert.equal(h.body.moved, 2);
+    const all = (await as(owner, '/api/leads')).body;
+    for (const id of [o1.id, o2.id]) {
+      const l = all.find((x) => x.id === id);
+      assert.equal(l.assignedTo.email, 'tara@test.in');
+      assert.match(l.history[0].text, /Handed over from Leaving Lal to Taking Tara by Test Admin · Left the company/);
+    }
+    const won = all.find((x) => x.id === w.id);
+    assert.equal(won.assignedTo, null); // the won deal stays credited to Lal
+    const tara = (await login('tara@test.in', 'TakingTara123')).ck;
+    const taraLeads = (await as(tara, '/api/leads')).body.map((l) => l.id);
+    assert.ok(taraLeads.includes(o1.id) && taraLeads.includes(o2.id));
+    assert.ok((await as(owner, '/api/activity?type=leads_handed_over')).body.some((x) => /2 open lead\(s\) from Leaving Lal to Taking Tara/.test(x.note)));
+  });
+  test('website enquiries: home finder answers saved; every new staff member sees them by default; only owners delete', async () => {
+    const body = {
+      form: 'Home finder · call me back',
+      name: 'Finder Visitor',
+      phone: '9555000401',
+      interest: 'Panchawati Residency · 2 BHK',
+      finder: { people: '3 – 4 (Small family)', budget: '₹60 L – ₹90 L', need: 'Schools', suggestion: '2 BHK · Panchawati Residency' },
+    };
+    assert.equal((await call('/api/enquiries', { method: 'POST', body, auth: false, headers: { 'X-Forwarded-For': '10.0.0.41' } })).status, 201);
+    assert.equal((await call('/api/enquiries', { method: 'POST', body: { ...body, finder: { people: 'x', hack: 1 } }, auth: false, headers: { 'X-Forwarded-For': '10.0.0.42' } })).status, 400);
+    const e = (await as(owner, '/api/enquiries')).body.find((x) => x.phone === '9555000401');
+    assert.deepEqual(e.finder, body.finder);
+    // in the owner's activity log too
+    assert.ok((await as(owner, '/api/activity?type=enquiry_received')).body.some((a) => a.name === 'Finder Visitor' && a.note.includes('+91 9555000401')));
+    // a brand-new sales and site-visit executive see enquiries without the owner ticking anything
+    await as(owner, '/api/users', { method: 'POST', body: { name: 'New Seller', email: 'seller.new@test.in', role: 'sales', password: 'NewSeller123' } });
+    const sv = await as(owner, '/api/users', { method: 'POST', body: { name: 'New Guide', email: 'guide.new@test.in', role: 'site_visit', password: 'NewGuide1234' } });
+    assert.deepEqual(sv.body.permissions, ['visits.log', 'enquiries.view']);
+    for (const [email, pw] of [['seller.new@test.in', 'NewSeller123'], ['guide.new@test.in', 'NewGuide1234']]) {
+      const ck = (await login(email, pw)).ck;
+      assert.ok((await as(ck, '/api/enquiries')).body.some((x) => x.id === e.id), email + ' sees the enquiry');
+      assert.equal((await as(ck, `/api/enquiries/${e.id}`, { method: 'DELETE', body: {} })).status, 403); // staff can't delete
+    }
+    // the owner can take it away from one person
+    await as(owner, `/api/users/${sv.body.id}`, { method: 'PATCH', body: { permissions: ['visits.log'] } });
+    assert.equal((await as((await login('guide.new@test.in', 'NewGuide1234')).ck, '/api/enquiries')).status, 403);
+    // Fidelsya sees it; the owner deletes it and that is recorded
+    assert.ok((await as(fid, '/api/enquiries')).body.some((x) => x.id === e.id));
+    assert.equal((await as(owner, `/api/enquiries/${e.id}`, { method: 'DELETE', body: {} })).status, 200);
+    assert.ok((await as(owner, '/api/activity?type=enquiry_deleted')).body.some((a) => a.target.name === 'Finder Visitor'));
+  });
+  test('project on the website: details + photos, shown only when the owner switches it on; all recorded', async () => {
+    const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+    const p = (await as(owner, '/api/projects', { method: 'POST', body: { name: 'Sai Krishna Green Heights', location: 'Khandagiri, Bhubaneswar', rera: 'RP/19/2026/00123' } })).body;
+    assert.equal(p.slug, 'sai-krishna-green-heights');
+    assert.equal(p.web.published, false);
+    // not on the website yet
+    assert.ok(!(await call('/api/public/projects', { auth: false })).body.some((x) => x.id === p.id));
+    assert.equal((await call(`/api/public/projects/${p.slug}`, { auth: false })).status, 404);
+    // can't publish while details are missing
+    const early = await as(owner, `/api/projects/${p.id}`, { method: 'PATCH', body: { web: { published: true } } });
+    assert.equal(early.status, 400);
+    assert.ok(early.body.missing.includes('at least one photo'));
+    // fill in the details
+    const web = {
+      status: 'ongoing',
+      tagline: 'Green living near Khandagiri',
+      about: 'Sai Krishna Green Heights brings 2 and 3 BHK homes with open green spaces, close to schools and the ring road.',
+      configs: ['2 BHK', '3 BHK'],
+      startingPrice: 5500000,
+      possession: 'Dec 2028',
+      highlights: ['RERA approved', 'Near Khandagiri square'],
+      amenities: ['Gym', 'Swimming pool'],
+      mapUrl: 'https://maps.google.com/?q=Khandagiri',
+    };
+    assert.equal((await as(owner, `/api/projects/${p.id}`, { method: 'PATCH', body: { web: { ...web, mapUrl: 'javascript:alert(1)' } } })).status, 400); // only https links
+    assert.equal((await as(owner, `/api/projects/${p.id}`, { method: 'PATCH', body: { web } })).status, 200);
+    // photos: staff can't, owner can; junk is refused
+    assert.equal((await as(vic, `/api/projects/${p.id}/photos`, { method: 'POST', body: { data: PNG } })).status, 403);
+    assert.equal((await as(owner, `/api/projects/${p.id}/photos`, { method: 'POST', body: { data: 'data:text/html;base64,PGgxPg==' } })).status, 400);
+    const ph1 = await as(owner, `/api/projects/${p.id}/photos`, { method: 'POST', body: { data: PNG, alt: 'Front view' } });
+    assert.equal(ph1.status, 201);
+    const ph2 = await as(owner, `/api/projects/${p.id}/photos`, { method: 'POST', body: { data: PNG, alt: 'Garden' } });
+    const [a, b] = ph2.body.web.photos;
+    // reorder: the garden becomes the cover
+    const re = await as(owner, `/api/projects/${p.id}`, { method: 'PATCH', body: { web: { photos: [{ id: b.id, alt: 'Garden' }, { id: a.id, alt: 'Front view' }] } } });
+    assert.equal(re.body.web.photos[0].id, b.id);
+    // the owner can preview before publishing; the public can't
+    const prev = await as(owner, `/api/public/projects/${p.slug}?preview=1`);
+    assert.equal(prev.status, 200);
+    assert.equal(prev.body.preview, true);
+    assert.equal((await as(vic, `/api/public/projects/${p.slug}?preview=1`)).status, 404);
+    // publish
+    const pub = await as(owner, `/api/projects/${p.id}`, { method: 'PATCH', body: { web: { published: true } } });
+    assert.equal(pub.status, 200);
+    const pubList = (await call('/api/public/projects', { auth: false })).body;
+    const shown = pubList.find((x) => x.id === p.id);
+    assert.ok(shown);
+    assert.equal(shown.name, 'Sai Krishna Green Heights');
+    assert.equal(shown.startingPrice, 5500000);
+    assert.equal(shown.photos[0].url, `/api/public/photos/${b.id}`);
+    assert.equal(shown.history, undefined); // nothing internal on the website
+    assert.equal(shown.createdBy, undefined);
+    assert.ok(!pubList.some((x) => x.builtIn !== undefined || x.leads !== undefined));
+    // the photo itself is served as an image, cached
+    const img = await fetch(base + shown.photos[0].url);
+    assert.equal(img.status, 200);
+    assert.equal(img.headers.get('content-type'), 'image/png');
+    assert.match(img.headers.get('cache-control'), /immutable/);
+    // rename: new web address, the old one still works
+    const ren = await as(owner, `/api/projects/${p.id}`, { method: 'PATCH', body: { name: 'Sai Krishna Green Hills' } });
+    assert.equal(ren.body.slug, 'sai-krishna-green-hills');
+    assert.equal((await call('/api/public/projects/sai-krishna-green-heights', { auth: false })).body.slug, 'sai-krishna-green-hills');
+    // can't remove the last photo or delete while it is on the website
+    await as(owner, `/api/projects/${p.id}/photos/${a.id}`, { method: 'DELETE', body: {} });
+    assert.equal((await as(owner, `/api/projects/${p.id}/photos/${b.id}`, { method: 'DELETE', body: {} })).status, 400);
+    assert.equal((await as(owner, `/api/projects/${p.id}`, { method: 'DELETE', body: {} })).status, 409);
+    // hide it, then delete: photos go too
+    assert.equal((await as(owner, `/api/projects/${p.id}`, { method: 'PATCH', body: { web: { published: false } } })).status, 200);
+    assert.ok(!(await call('/api/public/projects', { auth: false })).body.some((x) => x.id === p.id));
+    assert.equal((await as(owner, `/api/projects/${p.id}`, { method: 'DELETE', body: {} })).status, 200);
+    const db = await getDb();
+    assert.equal(await db.collection('project_photos').countDocuments({ projectId: p.id }), 0);
+    // all in the activity log
+    const log = (await as(owner, '/api/activity?limit=2000')).body.filter((x) => x.target?.name?.startsWith('Sai Krishna Green'));
+    const types = log.map((x) => x.type);
+    assert.ok(['project_created', 'project_updated', 'project_published', 'project_unpublished', 'project_deleted'].every((t) => types.includes(t)));
+    assert.ok(log.some((x) => /Website photo added/.test(x.note || '')));
+    // the built-in projects are still locked for website edits too
+    assert.equal((await as(owner, '/api/projects/PRJ-PANCHAWATI', { method: 'PATCH', body: { web: { published: true } } })).status, 403);
+  });
+  test('title (Mr. / Mrs. / Ms. / Dr.): chosen, never guessed; owner sets staff, everyone sets their own; recorded', async () => {
+    const t = await as(owner, '/api/users', { method: 'POST', body: { name: 'Priya Nayak', email: 'priya.t@test.in', role: 'sales', password: 'PriyaTitle123', title: 'Ms.' } });
+    assert.equal(t.body.title, 'Ms.');
+    assert.equal((await as(owner, '/api/users', { method: 'POST', body: { name: 'Bad Title', email: 'bad.t@test.in', role: 'sales', password: 'BadTitle1234', title: 'Sir' } })).status, 400);
+    const u = await as(owner, `/api/users/${t.body.id}`, { method: 'PATCH', body: { title: 'Mrs.' } });
+    assert.equal(u.body.title, 'Mrs.');
+    assert.deepEqual(u.body.history[0].changes.title, { from: 'Ms.', to: 'Mrs.' });
+    // the person sees it on login and can change their own
+    const ck = (await login('priya.t@test.in', 'PriyaTitle123')).ck;
+    assert.equal((await as(ck, '/api/auth/me')).body.title, 'Mrs.');
+    assert.equal((await as(ck, '/api/auth/me', { method: 'PATCH', body: { title: 'Dr.' } })).body.title, 'Dr.');
+    assert.equal((await as(ck, '/api/auth/me')).body.title, 'Dr.');
+    assert.equal((await as(ck, '/api/auth/me', { method: 'PATCH', body: { title: 'Lord' } })).status, 400);
+    // the owner sets their own too
+    assert.equal((await as(owner, '/api/auth/me', { method: 'PATCH', body: { title: 'Mr.' } })).body.title, 'Mr.');
+    assert.equal((await as(owner, '/api/auth/me', { method: 'PATCH', body: { title: '' } })).body.title, '');
+    const log = (await as(owner, '/api/activity?type=user_updated')).body;
+    assert.ok(log.some((a) => a.email === 'priya.t@test.in' && a.changes?.title?.to === 'Dr.'));
+  });
+  test('activity log: every piece of work on a lead or visit is recorded, linked to the lead; Fidelsya stays hidden', async () => {
+    const l = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Log Lead', phone: '9555000501', project: 'Panchawati Residency' } })).body;
+    await as(owner, `/api/leads/${l.id}`, { method: 'PATCH', body: { config: '3 BHK', notes: 'Wants east facing' } });
+    await as(owner, `/api/leads/${l.id}/attempts`, { method: 'POST', body: { type: 'Call', outcome: 'connected', note: 'Coming Sunday' } });
+    await as(owner, '/api/leads/status', { method: 'POST', body: { ids: [l.id], status: 'negotiation' } });
+    await as(owner, `/api/leads/${l.id}/commit`, { method: 'POST', body: { result: 'won', value: 6500000, unit: 'B-402', note: '' } });
+    await as(owner, `/api/leads/${l.id}/reopen`, { method: 'POST', body: {} });
+    const v = (await as(vic, '/api/visits', { method: 'POST', body: { customerName: 'Log Lead', phone: '9555000501', rating: 5, outcome: 'booking' } })).body;
+    await as(owner, `/api/visits/${v.id}`, { method: 'PATCH', body: { rating: 4 } });
+    await as(owner, `/api/visits/${v.id}`, { method: 'DELETE', body: {} });
+    await as(owner, '/api/leads/import', { method: 'POST', body: { drafts: [{ name: 'Imp One', phone: '9555000502' }, { name: 'Imp Two', phone: '9555000503' }] } });
+    const log = (await as(owner, '/api/activity?limit=2000')).body;
+    const about = log.filter((a) => a.ref?.id === l.id);
+    const types = about.map((a) => a.type);
+    for (const t of ['lead_created', 'lead_updated', 'attempt_logged', 'lead_status_changed', 'deal_won', 'deal_reopened', 'visit_recorded', 'visit_updated'])
+      assert.ok(types.includes(t), t + ' is logged');
+    assert.deepEqual(about.find((a) => a.type === 'lead_updated').changes.config, { from: '', to: '3 BHK' });
+    assert.match(about.find((a) => a.type === 'deal_won').note, /₹65,00,000 · B-402/);
+    assert.match(about.find((a) => a.type === 'attempt_logged').note, /Call · connected · “Coming Sunday”/);
+    assert.equal(about.find((a) => a.type === 'visit_recorded').email, 'vic@test.in'); // who did it
+    assert.ok(log.some((a) => a.type === 'visit_deleted' && a.target.name === 'Log Lead'));
+    assert.ok(log.some((a) => a.type === 'leads_imported' && /2 lead\(s\) from Excel/.test(a.note)));
+    // Fidelsya's work on a lead: Fidelsya sees it, the owner does not
+    await as(fid, `/api/leads/${l.id}/attempts`, { method: 'POST', body: { type: 'Call', outcome: 'connected', note: 'support check' } });
+    assert.ok(!(await as(owner, '/api/activity?limit=2000')).body.some((a) => /support check/.test(a.note || '')));
+    assert.ok((await as(fid, '/api/activity?limit=2000')).body.some((a) => /support check/.test(a.note || '')));
+  });
+
+  test('Management (CMO, GM): every owner power by default, but the owner holds the keys', async () => {
+    const make = (ck, body) => as(ck, '/api/users', { method: 'POST', body });
+    const c = await make(owner, { name: 'Ravi Kumar', email: 'cmo@test.in', title: 'Mr.', designation: 'CMO', role: 'management', password: 'CmoPass12345' });
+    assert.equal(c.status, 201);
+    assert.equal(c.body.designation, 'CMO');
+    const all = (await as(owner, '/api/users/meta')).body.permissions.map((p) => p.id);
+    assert.deepEqual([...c.body.permissions].sort(), [...all].sort()); // everything, like the owner
+    const g = (await make(owner, { name: 'Gita Rao', email: 'gm@test.in', title: 'Mrs.', designation: 'GM', role: 'management', password: 'GmPass123456' })).body;
+
+    const cmo = (await login('cmo@test.in', 'CmoPass12345')).ck;
+    const me = (await as(cmo, '/api/auth/me')).body;
+    assert.equal(me.role, 'management');
+    assert.equal(me.designation, 'CMO');
+    assert.equal(me.title, 'Mr.');
+    for (const path of ['/api/users', '/api/activity', '/api/leads/trash', '/api/reports']) {
+      const r = await as(cmo, path);
+      assert.ok(r.status !== 403, path + ' is open for Management');
+    }
+    assert.deepEqual((await as(cmo, '/api/users/meta')).body.canCreate, ['sales', 'site_visit']);
+    assert.ok(!(await as(cmo, '/api/users')).body.some((u) => u.email === 'fid@fidelsya.test')); // Fidelsya hidden
+
+    // can run the sales team…
+    const s = await make(cmo, { name: 'Neha Sales', email: 'neha@test.in', role: 'sales', password: 'NehaSales123', permissions: ['leads.create', 'team.manage'] });
+    assert.equal(s.status, 201);
+    assert.deepEqual(s.body.permissions, ['leads.create']); // owner-level powers never go to sales
+    // …but never the owner, another Management account, or a new owner / Management
+    assert.equal((await make(cmo, { name: 'Xavier One', email: 'x1@test.in', role: 'management', password: 'Xxxxxxxx123' })).status, 403);
+    assert.equal((await make(cmo, { name: 'Xavier Two', email: 'x2@test.in', role: 'owner', password: 'Xxxxxxxx123' })).status, 403);
+    assert.equal((await as(cmo, `/api/users/${ownerId}`, { method: 'PATCH', body: { name: 'Hacked' } })).status, 403);
+    assert.equal((await as(cmo, `/api/users/${g.id}`, { method: 'PATCH', body: { name: 'Hacked' } })).status, 403);
+    assert.equal((await as(cmo, `/api/users/${g.id}/password`, { method: 'POST', body: { password: 'NewPass12345' } })).status, 403);
+    assert.equal((await as(cmo, `/api/users/${g.id}/status`, { method: 'PATCH', body: { active: false } })).status, 403);
+
+    // the owner takes some powers away: they stop at once, and CMO can't hand them out either
+    const cut = await as(owner, `/api/users/${c.body.id}`, { method: 'PATCH', body: { permissions: all.filter((p) => !['activity.view', 'leads.delete'].includes(p)), designation: 'Chief Marketing Officer' } });
+    assert.equal(cut.status, 200);
+    assert.deepEqual(cut.body.history[0].changes.permissions.removed.sort(), ['activity.view', 'leads.delete']);
+    assert.equal(cut.body.designation, 'Chief Marketing Officer');
+    assert.equal((await as(cmo, '/api/activity')).status, 403);
+    const n = await as(cmo, `/api/users/${s.body.id}`, { method: 'PATCH', body: { permissions: ['leads.create', 'leads.delete'] } });
+    assert.deepEqual(n.body.permissions, ['leads.create']);
+
+    // everything CMO did is in the owner's activity log
+    const log = (await as(owner, '/api/activity?limit=2000')).body;
+    assert.ok(log.some((a) => a.type === 'admin_created' && a.email === 'cmo@test.in' && a.target.email === 'neha@test.in'));
+    assert.ok(log.some((a) => a.type === 'user_updated' && a.email === 'admin@test.in' && a.target.email === 'cmo@test.in'));
+
+    // owner resets the password (CMO logged out); Fidelsya can change Management too
+    assert.equal((await as(owner, `/api/users/${c.body.id}/password`, { method: 'POST', body: { password: 'Fresh123456' } })).status, 200);
+    assert.equal((await as(cmo, '/api/auth/me')).status, 401);
+    assert.equal((await as(fid, `/api/users/${g.id}`, { method: 'PATCH', body: { phone: '9876512345' } })).status, 200);
+    // made Sales: owner-level powers are dropped
+    const moved = await as(owner, `/api/users/${g.id}`, { method: 'PATCH', body: { role: 'sales' } });
+    assert.ok(!moved.body.permissions.some((p) => ['team.manage', 'activity.view', 'projects.manage'].includes(p)));
+    assert.ok(moved.body.permissions.includes('leads.view_all'));
   });
 });

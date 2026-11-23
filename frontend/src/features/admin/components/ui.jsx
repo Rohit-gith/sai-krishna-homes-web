@@ -10,7 +10,13 @@ export function StatusBadge({ status, className }) {
   const s = STATUS[status];
   if (!s) return null;
   return (
-    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset', s.badge, className)}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset',
+        s.badge,
+        className,
+      )}
+    >
       <span className={cn('h-1.5 w-1.5 rounded-full', s.dot)} />
       {s.label}
     </span>
@@ -20,11 +26,22 @@ export function StatusBadge({ status, className }) {
 export function OutcomeBadge({ outcome }) {
   const o = OUTCOME[outcome];
   if (!o) return null;
-  return <span className={cn('inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset', o.badge)}>{o.label}</span>;
+  return (
+    <span
+      className={cn(
+        'inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset',
+        o.badge,
+      )}
+    >
+      {o.label}
+    </span>
+  );
 }
 
 export function Card({ className, children }) {
-  return <div className={cn('rounded-2xl border border-slate-200 bg-white', className)}>{children}</div>;
+  return (
+    <div className={cn('rounded-2xl border border-slate-200 bg-white', className)}>{children}</div>
+  );
 }
 
 export const fieldCls =
@@ -107,7 +124,12 @@ export function Modal({ open, onClose, title, children, wide = false }) {
           >
             <div className="mb-5 flex items-start justify-between gap-4">
               <h2 className="font-display text-xl font-bold text-navy-950">{title}</h2>
-              <button type="button" onClick={onClose} aria-label="Close" className="-m-2 rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="-m-2 rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>

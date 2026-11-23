@@ -17,8 +17,9 @@ import {
 import { useSchedulerStore } from '@/store/useSchedulerStore';
 import { useUiStore } from '@/store/useUiStore';
 import { submitEnquiry } from '@/services/crmApi';
+import { finderLine } from '@/features/welcome/finderLine';
 import { COMPANY } from '@/data/companyInfo';
-import { PROJECT_PAGES } from '@/data/projectPages';
+import { useProjectList } from '@/data/liveProjects';
 import logoImg from '@/assets/logo/logo.png';
 import { Namaste, PetalShower } from '@/features/welcome/Blessings';
 import { cn } from '@/utils/cn';
@@ -35,7 +36,7 @@ const DAYS_AHEAD = 45;
 const CONFIGS = ['1 BHK', '2 BHK', '3 BHK', 'Not sure yet'];
 
 // Short place name for the cards ("South Bhubaneswar · Near …" → "South Bhubaneswar").
-const PROJECTS = PROJECT_PAGES.map((p) => ({ slug: p.slug, name: p.name, place: p.location.split('·')[0].trim() }));
+const asChoice = (p) => ({ slug: p.slug, name: p.name, place: (p.location || '').split('·')[0].trim() });
 const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -144,6 +145,8 @@ function Calendar({ value, onChange }) {
 
 export default function SchedulerModal() {
   const { open, prefill, openScheduler, closeScheduler } = useSchedulerStore();
+  const all = useProjectList();
+  const PROJECTS = useMemo(() => all.map(asChoice), [all]);
   const closeMenu = useUiStore((s) => s.closeMobileMenu);
   const [step, setStep] = useState(1);
   const [project, setProject] = useState(PROJECTS[0].slug);
@@ -204,8 +207,9 @@ export default function SchedulerModal() {
       phone: f.phone,
       email: f.email.trim(),
       interest: `${proj.name} · ${f.config}`,
-      message: `Requested visit: ${when}${f.notes.trim() ? `. Note: ${f.notes.trim()}` : ''}`,
+      message: `Requested visit: ${when}${f.notes.trim() ? `. Note: ${f.notes.trim()}` : ''}${prefill.finder ? `. ${finderLine(prefill.finder)}` : ''}`,
       visitAt: start.toISOString(),
+      ...(prefill.finder ? { finder: prefill.finder } : {}),
     });
     const msg = [
       `Hello ${COMPANY.shortName}, I'd like to book a site visit.`,

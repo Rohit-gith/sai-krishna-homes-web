@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Shown for a moment while Playfair Display downloads. Sized to the same width as Playfair, so headings
+ * wrap the same way and nothing below them jumps when the real font arrives.
+ */
+@font-face {
+  font-family: 'Playfair Fallback';
+  src: local('Times New Roman'), local('Times'), local('Liberation Serif'), local('Tinos');
+  size-adjust: 106%;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

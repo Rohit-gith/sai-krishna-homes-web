@@ -5,7 +5,8 @@ import { ArrowUpRight, BadgeCheck, Expand, MapPin } from 'lucide-react';
 import Reveal from '@/components/common/Reveal';
 import CtaSection from '@/components/common/CtaSection';
 import { Lightbox } from '@/features/home/components/GallerySection';
-import { PAST_WORK, PROJECT_PAGES, projectPath } from '@/data/projectPages';
+import { PAST_WORK, projectPath } from '@/data/projectPages';
+import { useProjectList } from '@/data/liveProjects';
 import { responsive } from '@/data/projects';
 import { COMPANY } from '@/data/companyInfo';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -30,18 +31,21 @@ function CurrentProject({ p, i }) {
           <span className="absolute left-4 top-4 bg-ivory px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-navy-900 sm:left-6 sm:top-6">
             {p.status}
           </span>
-          <span className="absolute bottom-4 left-4 flex items-center gap-2 bg-navy-950/70 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur sm:bottom-6 sm:left-6">
-            <BadgeCheck className="h-4 w-4 text-primary-300" /> RERA {p.rera}
-          </span>
+          {p.rera && (
+            <span className="absolute bottom-4 left-4 flex items-center gap-2 bg-navy-950/70 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur sm:bottom-6 sm:left-6">
+              <BadgeCheck className="h-4 w-4 text-primary-300" /> RERA {p.rera}
+            </span>
+          )}
         </Link>
 
         <div className={cn(flip && 'lg:order-1')}>
-          <p className="text-outline-gold font-serif text-6xl leading-none md:text-7xl">0{i + 1}</p>
+          <p className="text-outline-gold font-serif text-6xl leading-none md:text-7xl">{String(i + 1).padStart(2, '0')}</p>
           <h2 className="mt-4 text-[2.3rem] leading-[1.08] text-navy-950 md:text-[3rem]">{p.name}</h2>
-          <p className="mt-2 font-serif text-lg italic text-primary-700">{p.headline}</p>
+          {p.headline && <p className="mt-2 font-serif text-lg italic text-primary-700">{p.headline}</p>}
           <p className="mt-4 flex items-center gap-2 text-sm text-slate-600">
             <MapPin className="h-4 w-4 text-primary-600" /> {p.location}
           </p>
+          {p.stats.length > 0 && (
           <dl className="mt-7 grid grid-cols-2 gap-px border border-navy-900/10 bg-navy-900/10">
             {p.stats.slice(0, 4).map(([v, l]) => (
               <div key={l} className="bg-white px-4 py-4">
@@ -53,11 +57,12 @@ function CurrentProject({ p, i }) {
               </div>
             ))}
           </dl>
+          )}
           <div className="mt-6 flex flex-wrap gap-2">
             {p.startingFrom && (
               <span className="bg-primary-400 px-3 py-1.5 text-[12px] font-bold uppercase tracking-[0.12em] text-navy-950">
                 From <span className="rupee">₹</span>
-                {(p.startingFrom / 1e5).toFixed(2)} L*
+                {p.startingFrom >= 1e7 ? `${(p.startingFrom / 1e7).toFixed(2)} Cr` : `${(p.startingFrom / 1e5).toFixed(2)} L`}*
               </span>
             )}
             {p.configs.map((c) => (
@@ -125,6 +130,7 @@ export default function ProjectsPage() {
   useDocumentTitle('Our Projects', 'Current and completed projects by Sai Krishna Homes in Bhubaneswar: Panchawati Residency (Patia) and Sai Krishna Residency (South Bhubaneswar).');
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') === 'past' ? 'past' : 'current';
+  const projects = useProjectList();
 
   return (
     <>
@@ -146,7 +152,7 @@ export default function ProjectsPage() {
 
           <div className="mt-12 flex gap-8 border-b border-navy-900/10" role="tablist" aria-label="Projects">
             {[
-              ['current', 'Current projects', PROJECT_PAGES.length],
+              ['current', 'Current projects', projects.length],
               ['past', 'Past projects', PAST_WORK.length],
             ].map(([id, label, n]) => (
               <button
@@ -172,7 +178,7 @@ export default function ProjectsPage() {
         <div className="container">
           {tab === 'current' ? (
             <div className="space-y-24 md:space-y-32">
-              {PROJECT_PAGES.map((p, i) => (
+              {projects.map((p, i) => (
                 <CurrentProject key={p.slug} p={p} i={i} />
               ))}
             </div>

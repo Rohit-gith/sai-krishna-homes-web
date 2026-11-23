@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, CalendarCheck, GraduationCap, Hospital, RotateCcw, ShoppingBag, Sparkles, TrainFront, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarCheck, Check, GraduationCap, Hospital, PhoneCall, RotateCcw, ShoppingBag, Sparkles, TrainFront, Users } from 'lucide-react';
 import { HOMES } from '@/data/homes';
 import { LANDMARKS, COMPARE_PROJECTS } from '@/data/comparison';
 import { projectPath } from '@/data/projectPages';
 import { cn } from '@/utils/cn';
+import { useSchedulerStore } from '@/store/useSchedulerStore';
+import { submitEnquiry } from '@/services/crmApi';
+import { finderLine } from './finderLine';
 
 const ease = [0.22, 1, 0.36, 1];
 const lakh = (n) => `₹${(n / 1e5).toFixed(2).replace(/\.?0+$/, '')} L`;
@@ -64,6 +67,91 @@ function Choice({ on, onClick, children, className }) {
   );
 }
 
+/** The visitor's three answers + our suggestion, in words (sent with their enquiry). */
+function finderSummary(a, res) {
+  const p = PEOPLE.find((x) => x.id === a.people);
+  return {
+    people: `${p.label} (${p.sub})`,
+    budget: BUDGET.find((x) => x.id === a.budget).label,
+    need: NEED.find((x) => x.id === a.need).label,
+    suggestion: `${res.bhk} · ${res.project.name}`,
+  };
+}
+
+/** "Prefer a call?": just name + mobile; the answers go with it so the team knows what they want. */
+function CallMeBack({ finder, res }) {
+  const [f, setF] = useState({ name: '', phone: '' });
+  const [state, setState] = useState('idle'); // idle | sending | done
+  const [err, setErr] = useState('');
+  const send = async (e) => {
+    e.preventDefault();
+    if (state !== 'idle') return;
+    if (f.name.trim().length < 2) return setErr('Please enter your name.');
+    if (!/^[6-9]\d{9}$/.test(f.phone)) return setErr('Please enter a valid 10-digit mobile number.');
+    setErr('');
+    setState('sending');
+    const ok = await submitEnquiry({
+      form: 'Home finder · call me back',
+      name: f.name.trim(),
+      phone: f.phone,
+      interest: `${res.project.name} · ${res.bhk}`,
+      message: `Please call me back. ${finderLine(finder)}`,
+      finder,
+    });
+    if (!ok) {
+      setState('idle');
+      setErr('Could not send right now. Please call or WhatsApp us.');
+      return undefined;
+    }
+    setState('done');
+    return undefined;
+  };
+  if (state === 'done')
+    return (
+      <p className="mt-5 flex items-center gap-2 rounded-2xl bg-primary-400/15 px-4 py-3 text-[13.5px] text-primary-200">
+        <Check className="h-4 w-4 shrink-0" /> Thank you, {f.name.trim().split(' ')[0]}! Our team will call you shortly.
+      </p>
+    );
+  return (
+    <form onSubmit={send} noValidate className="mt-5 border-t border-white/10 pt-5">
+      <p className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.16em] text-white/70">
+        <PhoneCall className="h-4 w-4 text-primary-300" /> Prefer a call? We'll call you
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+        <input
+          value={f.name}
+          onChange={(e) => setF((v) => ({ ...v, name: e.target.value }))}
+          autoComplete="name"
+          aria-label="Your name"
+          placeholder="Your name"
+          className="rounded-full border border-white/20 bg-white/[0.06] px-4 py-3 text-[14px] text-white placeholder:text-white/40 focus:border-primary-300 focus:outline-none"
+        />
+        <input
+          value={f.phone}
+          onChange={(e) => setF((v) => ({ ...v, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+          inputMode="numeric"
+          autoComplete="tel-national"
+          aria-label="Mobile number"
+          placeholder="Mobile number"
+          className="rounded-full border border-white/20 bg-white/[0.06] px-4 py-3 text-[14px] text-white placeholder:text-white/40 focus:border-primary-300 focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={state === 'sending'}
+          className="whitespace-nowrap rounded-full bg-white px-6 py-3 text-[12px] font-bold uppercase tracking-[0.14em] text-navy-950 hover:bg-primary-200 disabled:opacity-60"
+        >
+          {state === 'sending' ? 'Sending…' : 'Call me'}
+        </button>
+      </div>
+      {err && (
+        <p role="alert" className="mt-2 text-[12.5px] text-rose-300">
+          {err}
+        </p>
+      )}
+    </form>
+  );
+}
+
 /** A one-off burst of gold confetti (celebrates the match). */
 function Confetti() {
   const bits = Array.from({ length: 34 }, (_, i) => ({
@@ -100,6 +188,8 @@ export default function HomeFinder() {
     setTimeout(() => setStep((s) => s + 1), 260);
   };
   const res = step === 3 ? recommend(a.people, a.budget, a.need) : null;
+  const finder = res ? finderSummary(a, res) : null;
+  const openScheduler = useSchedulerStore((s) => s.openScheduler);
 
   return (
     <section id="home-finder" className="relative scroll-mt-24 overflow-hidden bg-navy-950 py-16 text-white md:py-20">
@@ -184,13 +274,18 @@ export default function HomeFinder() {
                     </dl>
                     {res.overBudget && <p className="mt-3 text-[12.5px] text-white/55">A little above your budget: ask us about loan and payment plans.</p>}
                     <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
-                      <a href="#book-visit" data-project={res.project.slug} className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-primary-400 px-5 py-3.5 text-[12px] font-bold uppercase tracking-[0.14em] text-navy-950 hover:bg-primary-300">
+                      <button
+                        type="button"
+                        onClick={() => openScheduler({ project: res.project.slug, config: res.bhk, finder })}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-primary-400 px-5 py-3.5 text-[12px] font-bold uppercase tracking-[0.14em] text-navy-950 hover:bg-primary-300"
+                      >
                         <CalendarCheck className="h-4 w-4" /> Book a visit
-                      </a>
+                      </button>
                       <Link to={`${projectPath(res.project.slug)}#floor-plans`} className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-white/25 px-5 py-3.5 text-[12px] font-bold uppercase tracking-[0.14em] text-white hover:border-primary-300">
                         See the home <ArrowRight className="h-4 w-4" />
                       </Link>
                     </div>
+                    <CallMeBack finder={finder} res={res} />
                   </div>
                 </div>
               </motion.div>

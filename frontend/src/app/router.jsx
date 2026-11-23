@@ -14,12 +14,21 @@ const lazy = (load) =>
   reactLazy(() =>
     load()
       .then((m) => {
-        try { sessionStorage.removeItem(RELOAD_FLAG); } catch { /* storage blocked */ }
+        try {
+          sessionStorage.removeItem(RELOAD_FLAG);
+        } catch {
+          /* storage blocked */
+        }
         return m;
       })
       .catch((err) => {
         let reloaded = false;
-        try { reloaded = sessionStorage.getItem(RELOAD_FLAG) === '1'; sessionStorage.setItem(RELOAD_FLAG, '1'); } catch { /* storage blocked */ }
+        try {
+          reloaded = sessionStorage.getItem(RELOAD_FLAG) === '1';
+          sessionStorage.setItem(RELOAD_FLAG, '1');
+        } catch {
+          /* storage blocked */
+        }
         if (!reloaded) {
           window.location.reload();
           return new Promise(() => {}); // keep showing the loader until the reload happens
@@ -51,58 +60,143 @@ const LeadsPage = lazy(() => import('@/pages/admin/LeadsPage'));
 const LeadDetailPage = lazy(() => import('@/pages/admin/LeadDetailPage'));
 const AttemptsPage = lazy(() => import('@/pages/admin/AttemptsPage'));
 const EnquiriesPage = lazy(() => import('@/pages/admin/EnquiriesPage'));
+const TeamPage = lazy(() => import('@/pages/admin/TeamPage'));
+const ActivityPage = lazy(() => import('@/pages/admin/ActivityPage'));
+const AccountPage = lazy(() => import('@/pages/admin/AccountPage'));
+const VisitsPage = lazy(() => import('@/pages/admin/VisitsPage'));
+const ReportsPage = lazy(() => import('@/pages/admin/ReportsPage'));
+const AdminProjectsPage = lazy(() => import('@/pages/admin/ProjectsPage'));
+const PersonPage = lazy(() => import('@/pages/admin/PersonPage'));
+const RecycleBinPage = lazy(() => import('@/pages/admin/RecycleBinPage'));
+const ProjectWebsitePage = lazy(() => import('@/pages/admin/ProjectWebsitePage'));
+const RequireAccess = lazy(() => import('@/features/admin/components/RequireAccess'));
 
 const withLoader = (el) => <Suspense fallback={<PageLoader />}>{el}</Suspense>;
 
-export const router = createBrowserRouter([
-  // Admin CRM (own layout, login required)
-  { path: '/login', element: withLoader(<LoginPage />) },
+export const router = createBrowserRouter(
+  [
+    // Admin CRM (own layout, login required)
+    { path: '/login', element: withLoader(<LoginPage />) },
+    {
+      path: '/admin',
+      element: withLoader(<AdminLayout />),
+      children: [
+        { index: true, element: <DashboardPage /> },
+        { path: 'leads', element: <LeadsPage /> },
+        { path: 'leads/:id', element: <LeadDetailPage /> },
+        { path: 'attempts', element: <AttemptsPage /> },
+        {
+          path: 'enquiries',
+          element: (
+            <RequireAccess perm="enquiries.view">
+              <EnquiriesPage />
+            </RequireAccess>
+          ),
+        },
+        {
+          path: 'team',
+          element: (
+            <RequireAccess perm="team.manage">
+              <TeamPage />
+            </RequireAccess>
+          ),
+        },
+        {
+          path: 'activity',
+          element: (
+            <RequireAccess perm="activity.view">
+              <ActivityPage />
+            </RequireAccess>
+          ),
+        },
+        {
+          path: 'visits',
+          element: (
+            <RequireAccess anyOf={['visits.log', 'visits.view_all']}>
+              <VisitsPage />
+            </RequireAccess>
+          ),
+        },
+        {
+          path: 'reports',
+          element: (
+            <RequireAccess perm="reports.view">
+              <ReportsPage />
+            </RequireAccess>
+          ),
+        },
+        {
+          path: 'projects/:id',
+          element: (
+            <RequireAccess perm="projects.manage">
+              <ProjectWebsitePage />
+            </RequireAccess>
+          ),
+        },
+        {
+          path: 'recycle-bin',
+          element: (
+            <RequireAccess perm="leads.restore">
+              <RecycleBinPage />
+            </RequireAccess>
+          ),
+        },
+        {
+          path: 'team/:id',
+          element: (
+            <RequireAccess perm="team.manage">
+              <PersonPage />
+            </RequireAccess>
+          ),
+        },
+        {
+          path: 'projects',
+          element: (
+            <RequireAccess perm="projects.manage">
+              <AdminProjectsPage />
+            </RequireAccess>
+          ),
+        },
+        { path: 'account', element: <AccountPage /> },
+      ],
+    },
+    // Client landing page with its own luxury layout (no shared navbar/footer).
+    {
+      path: ROUTES.SAI_KRISHNA,
+      element: (
+        <Suspense fallback={<PageLoader />}>
+          <SaiKrishnaPage />
+        </Suspense>
+      ),
+    },
+    {
+      element: <MainLayout />,
+      children: [
+        { path: ROUTES.HOME, element: <HomePage /> },
+        { path: ROUTES.SERVICES, element: <ServicesPage /> },
+        { path: ROUTES.SERVICE_DETAIL, element: <ServiceDetailPage /> },
+        { path: ROUTES.PRODUCTS, element: <ProductsPage /> },
+        { path: ROUTES.ABOUT, element: <AboutPage /> },
+        { path: ROUTES.REGISTER, element: <RegisterPage /> },
+        { path: ROUTES.APPLICATION_STATUS, element: <ApplicationStatusPage /> },
+        { path: ROUTES.CONTACT, element: <ContactPage /> },
+        { path: '/explore/:slug', element: <ExplorePage /> },
+        { path: '/projects', element: <ProjectsPage /> },
+        { path: '/projects/:slug', element: <ProjectDetailPage /> },
+        { path: ROUTES.PRIVACY_POLICY, element: <PrivacyPolicyPage /> },
+        { path: ROUTES.TERMS, element: <TermsPage /> },
+        { path: '*', element: <NotFoundPage /> },
+      ],
+    },
+  ],
   {
-    path: '/admin',
-    element: withLoader(<AdminLayout />),
-    children: [
-      { index: true, element: <DashboardPage /> },
-      { path: 'leads', element: <LeadsPage /> },
-      { path: 'leads/:id', element: <LeadDetailPage /> },
-      { path: 'attempts', element: <AttemptsPage /> },
-      { path: 'enquiries', element: <EnquiriesPage /> },
-    ],
+    // Opt in to React Router v7 behaviour now (silences the future-flag console warnings).
+    future: {
+      v7_relativeSplatPath: true,
+      v7_fetcherPersist: true,
+      v7_normalizeFormMethod: true,
+      v7_partialHydration: true,
+      v7_skipActionErrorRevalidation: true,
+    },
   },
-  // Client landing page with its own luxury layout (no shared navbar/footer).
-  {
-    path: ROUTES.SAI_KRISHNA,
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <SaiKrishnaPage />
-      </Suspense>
-    ),
-  },
-  {
-    element: <MainLayout />,
-    children: [
-      { path: ROUTES.HOME, element: <HomePage /> },
-      { path: ROUTES.SERVICES, element: <ServicesPage /> },
-      { path: ROUTES.SERVICE_DETAIL, element: <ServiceDetailPage /> },
-      { path: ROUTES.PRODUCTS, element: <ProductsPage /> },
-      { path: ROUTES.ABOUT, element: <AboutPage /> },
-      { path: ROUTES.REGISTER, element: <RegisterPage /> },
-      { path: ROUTES.APPLICATION_STATUS, element: <ApplicationStatusPage /> },
-      { path: ROUTES.CONTACT, element: <ContactPage /> },
-      { path: '/explore/:slug', element: <ExplorePage /> },
-      { path: '/projects', element: <ProjectsPage /> },
-      { path: '/projects/:slug', element: <ProjectDetailPage /> },
-      { path: ROUTES.PRIVACY_POLICY, element: <PrivacyPolicyPage /> },
-      { path: ROUTES.TERMS, element: <TermsPage /> },
-      { path: '*', element: <NotFoundPage /> },
-    ],
-  },
-], {
-  // Opt in to React Router v7 behaviour now (silences the future-flag console warnings).
-  future: {
-    v7_relativeSplatPath: true,
-    v7_fetcherPersist: true,
-    v7_normalizeFormMethod: true,
-    v7_partialHydration: true,
-    v7_skipActionErrorRevalidation: true,
-  },
-});
+);

@@ -1,6 +1,10 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
+import { PROJECTS } from '../constants';
 import { api } from '@/services/crmApi';
 import { useUiStore } from '@/store/useUiStore';
+import { can } from '../access';
+import { useAuthStore } from './useAuthStore';
 
 /*
  * Admin CRM data, loaded from the backend (MongoDB) and shared by every admin on every device.
@@ -23,6 +27,7 @@ const merge = (list, fresh) => {
 export const useCrmStore = create((set, get) => ({
   leads: [],
   enquiries: [],
+  projects: [], // from the database: the 2 built-in website projects + any the owner added
   loaded: false,
   loading: false,
   loadError: '',
@@ -32,15 +37,99 @@ export const useCrmStore = create((set, get) => ({
     if (get().loading) return;
     set({ loading: true, loadError: '' });
     try {
-      const [leads, enquiries] = await Promise.all([api('/leads'), api('/enquiries')]);
-      set({ leads, enquiries, loaded: true, loading: false });
+      // fresh role + permissions first, so a change the owner just made shows at once
+      const user = await api('/auth/me');
+      useAuthStore.setState({ user });
+      // staff without "See website enquiries" don't ask for them (the server would say no)
+      const [leads, enquiries, projects] = await Promise.all([
+        api('/leads'),
+        can(user, 'enquiries.view') ? api('/enquiries') : Promise.resolve([]),
+        api('/projects').catch(() => []),
+      ]);
+      set({ leads, enquiries, projects, loaded: true, loading: false });
     } catch (e) {
       set({ loading: false, loadError: e.message });
+      // deactivated / password reset / session over: back to the login page
+      if (e.status === 401) useAuthStore.setState({ user: null, checked: true });
     }
   },
 
+  /**
+   * Fetch website enquiries again (every 30 s while the CRM is open, and when the tab comes back),
+   * so a visitor's form shows up without anyone pressing Refresh. Returns the ones that are new.
+   */
+  pollEnquiries: async () => {
+    const user = useAuthStore.getState().user;
+    if (!get().loaded || !can(user, 'enquiries.view')) return [];
+    const list = await api('/enquiries').catch(() => null);
+    if (!Array.isArray(list)) return [];
+    const known = new Set(get().enquiries.map((e) => e.id));
+    const fresh = list.filter((e) => !known.has(e.id));
+    set({ enquiries: list });
+    return fresh;
+  },
+
   /** Clear on logout so the next person on this device never sees the previous data. */
-  reset: () => set({ leads: [], enquiries: [], loaded: false, loadError: '' }),
+  reset: () => set({ leads: [], enquiries: [], projects: [], loaded: false, loadError: '' }),
+
+  /* ---------- projects (owner / co-owner) ---------- */
+  reloadProjects: async () => {
+    const projects = await api('/projects').catch(() => null);
+    if (projects) set({ projects });
+    return projects;
+  },
+  createProject: async (data) => {
+    try {
+      const p = await api('/projects', { method: 'POST', body: data });
+      await get().reloadProjects();
+      return p;
+    } catch (e) {
+      return fail(e);
+    }
+  },
+  updateProject: async (id, patch) => {
+    try {
+      const p = await api(`/projects/${id}`, { method: 'PATCH', body: patch });
+      // a renamed project also renames its leads: refresh everything
+      await get().load();
+      return p;
+    } catch (e) {
+      return fail(e);
+    }
+  },
+  /** Website details of one project: { web } (status, photos order, published…). Returns the project. */
+  saveProjectWeb: async (id, web) => {
+    try {
+      const p = await api(`/projects/${id}`, { method: 'PATCH', body: { web } });
+      set((s) => ({ projects: s.projects.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
+      return p;
+    } catch (e) {
+      return fail(e);
+    }
+  },
+  addProjectPhoto: async (id, data, alt = '') => {
+    const p = await api(`/projects/${id}/photos`, { method: 'POST', body: { data, alt } });
+    set((s) => ({ projects: s.projects.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
+    return p;
+  },
+  removeProjectPhoto: async (id, photoId) => {
+    try {
+      const p = await api(`/projects/${id}/photos/${photoId}`, { method: 'DELETE' });
+      set((s) => ({ projects: s.projects.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
+      return p;
+    } catch (e) {
+      return fail(e);
+    }
+  },
+  deleteProject: async (id) => {
+    try {
+      await api(`/projects/${id}`, { method: 'DELETE' });
+      await get().reloadProjects();
+      return true;
+    } catch (e) {
+      return fail(e);
+    }
+  },
 
   addLead: async (data) => {
     try {
@@ -115,7 +204,10 @@ export const useCrmStore = create((set, get) => ({
     let done = 0;
     for (let i = 0; i < drafts.length; i += BATCH) {
       try {
-        const created = await api('/leads/import', { method: 'POST', body: { drafts: drafts.slice(i, i + BATCH) } });
+        const created = await api('/leads/import', {
+          method: 'POST',
+          body: { drafts: drafts.slice(i, i + BATCH) },
+        });
         set((s) => ({ leads: [...created, ...s.leads] }));
         done += created.length;
         onProgress?.(done, drafts.length);
@@ -126,6 +218,46 @@ export const useCrmStore = create((set, get) => ({
     // newest first, as everywhere else in the CRM
     set((s) => ({ leads: [...s.leads].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }));
     return { done, total: drafts.length, error: '' };
+  },
+
+  /** Give leads to a team member (email) or unassign them (null). Resolves to how many changed. */
+  assignLeads: async (ids, to) => {
+    if (!ids.length) return 0;
+    try {
+      const updated = await api('/leads/assign', { method: 'POST', body: { ids, to } });
+      set((s) => ({ leads: merge(s.leads, updated) }));
+      return updated.length;
+    } catch (e) {
+      return fail(e);
+    }
+  },
+
+  /** People leads can be assigned to (needs "Assign leads"). */
+  loadAssignees: async () => {
+    try {
+      const list = await api('/leads/assignees');
+      set({ assignees: list });
+      return list;
+    } catch {
+      set({ assignees: [] });
+      return [];
+    }
+  },
+  assignees: [],
+
+  /** Record that a CSV was downloaded (who, when, how many). Never blocks the download. */
+  logExport: (count, filters = '') =>
+    api('/leads/exported', { method: 'POST', body: { count, filters } }).catch(() => null),
+
+  /** Every open lead of one person goes to another. Returns how many moved (null on error). */
+  handoverLeads: async (from, to, note = '') => {
+    try {
+      const r = await api('/leads/handover', { method: 'POST', body: { from, to, note } });
+      if (r.moved) await get().load();
+      return r.moved;
+    } catch (e) {
+      return fail(e);
+    }
   },
 
   deleteLeads: async (ids) => {
@@ -161,3 +293,9 @@ export const useCrmStore = create((set, get) => ({
     }
   },
 }));
+
+/** Project names for every CRM dropdown (falls back to the two built-in ones before the first load). */
+export function useProjectNames() {
+  const projects = useCrmStore((st) => st.projects);
+  return useMemo(() => (projects.length ? projects.map((p) => p.name) : PROJECTS), [projects]);
+}

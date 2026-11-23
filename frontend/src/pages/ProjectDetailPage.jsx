@@ -18,6 +18,7 @@ import InteractivePlan from '@/features/projects/InteractivePlan';
 import WalkthroughSection from '@/features/projects/WalkthroughSection';
 import FacilityStrip from '@/features/projects/FacilityStrip';
 import { PROJECT_PAGES, projectPath } from '@/data/projectPages';
+import LiveProjectPage from '@/features/projects/LiveProjectPage';
 import { responsive } from '@/data/projects';
 import { COMPANY } from '@/data/companyInfo';
 import { whatsappLink } from '@/utils/whatsapp';
@@ -471,6 +472,11 @@ function BrochureTab({ onClick }) {
 export default function ProjectDetailPage() {
   const { slug } = useParams();
   const p = PROJECT_PAGES.find((x) => x.slug === slug);
+  // not one of the two built-in projects: a project the owner added in the CRM
+  return p ? <BuiltInProjectPage p={p} /> : <LiveProjectPage slug={slug} />;
+}
+
+function BuiltInProjectPage({ p }) {
   useDocumentTitle(
     p ? `${p.name} · ${p.location}` : 'Projects',
     p && `${p.name}, ${p.location} by Sai Krishna Homes: ${p.configs.join(', ')} homes. RERA ${p.rera}. Floor plans, price list, brochure, amenities and site visits.`,
@@ -479,7 +485,7 @@ export default function ProjectDetailPage() {
   const [brochure, setBrochure] = useState(false);
   const openBrochure = useCallback(() => setBrochure(true), []);
   const closeBrochure = useCallback(() => setBrochure(false), []);
-  const sections = useMemo(() => (p ? sectionsFor(p) : []), [p]);
+  const sections = useMemo(() => sectionsFor(p), [p]);
   const enquireFlat = useCallback(
     (r) => {
       const c = p.contact;
@@ -491,7 +497,6 @@ export default function ProjectDetailPage() {
     },
     [p],
   );
-  if (!p) return <Navigate to="/projects" replace />;
   const ROMANS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
   const roman = (id) => ROMANS[sections.findIndex(([x]) => x === id)];
 

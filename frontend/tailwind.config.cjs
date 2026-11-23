@@ -75,7 +75,7 @@ module.exports = {
         // Typography system: Playfair Display (headings) + Manrope (everything else)
         sans: ['"Manrope"', 'system-ui', 'sans-serif'],
         display: ['"Manrope"', 'system-ui', 'sans-serif'],
-        serif: ['"Playfair Display"', 'Georgia', 'serif'],
+        serif: ['"Playfair Display"', '"Playfair Fallback"', 'Georgia', 'serif'],
         script: ['"Pinyon Script"', 'cursive'],
         lux: ['"Manrope"', 'system-ui', 'sans-serif'],
       },

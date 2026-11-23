@@ -10,6 +10,28 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * This browser's own ID, made once and kept in this browser, so the activity log can tell two
+ * devices apart even when they share one WiFi (and one internet IP). Clearing the browser's data
+ * or a private window gives a new one.
+ */
+let deviceIdCache = '';
+export function deviceId() {
+  if (deviceIdCache) return deviceIdCache;
+  const fresh = () =>
+    Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('');
+  try {
+    deviceIdCache = localStorage.getItem('skh_device') || '';
+    if (!/^[a-f0-9]{12}$/.test(deviceIdCache)) {
+      deviceIdCache = fresh();
+      localStorage.setItem('skh_device', deviceIdCache);
+    }
+  } catch {
+    deviceIdCache = fresh(); // storage blocked: one ID for this visit
+  }
+  return deviceIdCache;
+}
+
 export async function api(path, { method = 'GET', body, keepalive = false } = {}) {
   let res;
   try {
@@ -17,7 +39,10 @@ export async function api(path, { method = 'GET', body, keepalive = false } = {}
       method,
       credentials: 'same-origin',
       keepalive,
-      headers: method === 'GET' ? undefined : { 'Content-Type': 'application/json' },
+      headers: {
+        'X-Device-Id': deviceId(),
+        ...(method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
+      },
       body: method === 'GET' ? undefined : JSON.stringify(body ?? {}),
     });
   } catch {

@@ -1,13 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Modal, Field, Btn, fieldCls } from './ui';
-import { CONFIGS, PROJECTS, SOURCES } from '../constants';
+import { CONFIGS, SOURCES } from '../constants';
+import { useProjectNames } from '../store/useCrmStore';
 import { useCrmStore } from '../store/useCrmStore';
 import { useUiStore } from '@/store/useUiStore';
 
-const EMPTY = { name: '', phone: '', email: '', project: '', config: '', source: 'Walk-in', budget: '', dealValue: '', nextFollowUp: '', notes: '' };
+const EMPTY = {
+  name: '',
+  phone: '',
+  email: '',
+  project: '',
+  config: '',
+  source: 'Walk-in',
+  budget: '',
+  dealValue: '',
+  nextFollowUp: '',
+  notes: '',
+};
 
 /** Add a new lead, or edit an existing one (pass `lead`). */
 export default function LeadFormModal({ open, onClose, lead, initial, onSaved }) {
+  const projectNames = useProjectNames();
   const addLead = useCrmStore((s) => s.addLead);
   const updateLead = useCrmStore((s) => s.updateLead);
   const toast = useUiStore((s) => s.showToast);
@@ -20,7 +33,13 @@ export default function LeadFormModal({ open, onClose, lead, initial, onSaved })
     setErr({});
     setF(
       lead
-        ? { ...EMPTY, ...lead, budget: lead.budget || '', dealValue: lead.dealValue || '', nextFollowUp: lead.nextFollowUp?.slice(0, 10) || '' }
+        ? {
+            ...EMPTY,
+            ...lead,
+            budget: lead.budget || '',
+            dealValue: lead.dealValue || '',
+            nextFollowUp: lead.nextFollowUp?.slice(0, 10) || '',
+          }
         : { ...EMPTY, ...initial },
     );
   }, [open, lead, initial]);
@@ -37,7 +56,10 @@ export default function LeadFormModal({ open, onClose, lead, initial, onSaved })
     setErr(er);
     if (Object.keys(er).length) return;
 
-    const data = { ...f, nextFollowUp: f.nextFollowUp ? new Date(`${f.nextFollowUp}T10:00:00`).toISOString() : null };
+    const data = {
+      ...f,
+      nextFollowUp: f.nextFollowUp ? new Date(`${f.nextFollowUp}T10:00:00`).toISOString() : null,
+    };
     setBusy(true);
     if (lead) {
       const ok = await updateLead(lead.id, {
@@ -73,44 +95,78 @@ export default function LeadFormModal({ open, onClose, lead, initial, onSaved })
           <input className={fieldCls} value={f.name} onChange={set('name')} autoComplete="off" />
         </Field>
         <Field label="Mobile number" required error={err.phone}>
-          <input className={fieldCls} value={f.phone} onChange={(e) => setF((v) => ({ ...v, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))} inputMode="numeric" />
+          <input
+            className={fieldCls}
+            value={f.phone}
+            onChange={(e) =>
+              setF((v) => ({ ...v, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))
+            }
+            inputMode="numeric"
+          />
         </Field>
         <Field label="Email" error={err.email}>
           <input className={fieldCls} value={f.email} onChange={set('email')} type="email" />
         </Field>
         <Field label="Source">
           <select className={fieldCls} value={f.source} onChange={set('source')}>
-            {SOURCES.map((s) => <option key={s}>{s}</option>)}
+            {SOURCES.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
           </select>
         </Field>
         <Field label="Project">
           <select className={fieldCls} value={f.project} onChange={set('project')}>
             <option value="">Not decided</option>
-            {PROJECTS.map((s) => <option key={s}>{s}</option>)}
+            {projectNames.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
           </select>
         </Field>
         <Field label="Configuration">
           <select className={fieldCls} value={f.config} onChange={set('config')}>
             <option value="">Not decided</option>
-            {CONFIGS.map((s) => <option key={s}>{s}</option>)}
+            {CONFIGS.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
             {f.config && !CONFIGS.includes(f.config) && <option>{f.config}</option>}
           </select>
         </Field>
         <Field label="Customer budget (₹)">
-          <input className={fieldCls} value={f.budget} onChange={set('budget')} inputMode="numeric" placeholder="e.g. 4500000" />
+          <input
+            className={fieldCls}
+            value={f.budget}
+            onChange={set('budget')}
+            inputMode="numeric"
+            placeholder="e.g. 4500000"
+          />
         </Field>
         <Field label="Expected deal value (₹)">
-          <input className={fieldCls} value={f.dealValue} onChange={set('dealValue')} inputMode="numeric" placeholder="e.g. 4350000" />
+          <input
+            className={fieldCls}
+            value={f.dealValue}
+            onChange={set('dealValue')}
+            inputMode="numeric"
+            placeholder="e.g. 4350000"
+          />
         </Field>
         <Field label="Next follow-up">
-          <input className={fieldCls} value={f.nextFollowUp} onChange={set('nextFollowUp')} type="date" />
+          <input
+            className={fieldCls}
+            value={f.nextFollowUp}
+            onChange={set('nextFollowUp')}
+            type="date"
+          />
         </Field>
         <Field label="Notes" className="sm:col-span-2">
           <textarea className={fieldCls} rows={3} value={f.notes} onChange={set('notes')} />
         </Field>
         <div className="flex flex-col-reverse gap-2 pt-2 sm:col-span-2 sm:flex-row sm:justify-end">
-          <Btn variant="outline" onClick={onClose}>Cancel</Btn>
-          <Btn type="submit" disabled={busy}>{busy ? 'Saving…' : lead ? 'Save changes' : 'Create lead'}</Btn>
+          <Btn variant="outline" onClick={onClose}>
+            Cancel
+          </Btn>
+          <Btn type="submit" disabled={busy}>
+            {busy ? 'Saving…' : lead ? 'Save changes' : 'Create lead'}
+          </Btn>
         </div>
       </form>
     </Modal>

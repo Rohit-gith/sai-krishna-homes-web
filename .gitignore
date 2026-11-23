@@ -12,3 +12,6 @@ _raw-photos/
 
 # Client documents (originals; web copies go to public/)
 _client-docs/
+
+# throwaway database of `npm run dev:memory`
+backend/.memory-db/

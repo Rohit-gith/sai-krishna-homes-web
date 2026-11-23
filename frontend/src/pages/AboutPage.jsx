@@ -16,7 +16,7 @@ import { cn } from '@/utils/cn';
 /* All copy below is taken verbatim from the client's existing website (About page). */
 
 const MD_MESSAGE = [
-  'At Sai Krishna Homes Pvt. Ltd., we believe every project is an opportunity to create lasting value. Our journey has been driven by an unwavering commitment to quality, health, safety, sustainability and excellence.',
+  'At Saikrishna Homes Pvt. Ltd., we believe every project is an opportunity to create lasting value. Our journey has been driven by an unwavering commitment to quality, health, safety, sustainability and excellence.',
   'We believe great achievements begin with great people. By fostering a culture built on trust, transparency, accountability, discipline and open communication, we empower our team to consistently deliver their best.',
   'As the real estate and construction landscape continues to evolve, we are strengthening our capabilities through experienced leadership, skilled professionals, advanced technology and state of the art equipment, preparing us to take on ambitious projects and emerging opportunities.',
   'We take pride in how far we have come, but our vision is always forward. With integrity as our foundation and excellence as our ambition, we remain committed to building better, creating lasting value and shaping a stronger future.',
@@ -114,7 +114,7 @@ function Pillars() {
 const LEADERS = [LEADERSHIP.md, ...LEADERSHIP.contacts];
 
 export default function AboutPage() {
-  useDocumentTitle('About Us', 'Sai Krishna Homes Pvt. Ltd., building homes in Bhubaneswar since 2010. Our story, mission and values, and a message from our Managing Director.');
+  useDocumentTitle('About Us', 'Saikrishna Homes Pvt. Ltd., building homes in Bhubaneswar since 2010. Our story, mission and values, and a message from our Managing Director.');
   const { md, contacts } = LEADERSHIP;
 
   return (

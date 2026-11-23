@@ -5,7 +5,7 @@ import { COMPANY } from '@/data/companyInfo';
 export const SITE_URL = 'https://sai-krishna-homes-web.vercel.app';
 
 const DEFAULT_DESCRIPTION =
-  'Sai Krishna Homes Pvt. Ltd. — premium residences in Bhubaneswar since 2010. Panchawati Residency, Patia and Sai Krishna Residency, South Bhubaneswar. RERA approved.';
+  'Saikrishna Homes Pvt. Ltd. — premium residences in Bhubaneswar since 2010. Panchawati Residency, Patia and Sai Krishna Residency, South Bhubaneswar. RERA approved.';
 
 /** Find or create a <meta>/<link> tag in <head> and set one attribute on it. */
 function setHead(selector, create, attr, value) {

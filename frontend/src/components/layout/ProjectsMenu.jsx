@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpRight, BadgeCheck, Calculator, ChevronDown, History, LayoutGrid, RotateCw } from 'lucide-react';
-import { PROJECT_PAGES, projectPath } from '@/data/projectPages';
+import { projectPath } from '@/data/projectPages';
+import { useProjectList } from '@/data/liveProjects';
 import { cn } from '@/utils/cn';
 
 const EXTRA = [
@@ -17,6 +18,8 @@ export default function ProjectsMenu({ align = 'left' }) {
   const [open, setOpen] = useState(false);
   const timer = useRef(null);
   const { pathname, search } = useLocation();
+  const projects = useProjectList();
+  const shown = projects.slice(0, 4); // the rest are one click away in "All projects"
 
   useEffect(() => setOpen(false), [pathname, search]);
   useEffect(() => {
@@ -66,25 +69,29 @@ export default function ProjectsMenu({ align = 'left' }) {
             transition={{ duration: 0.22 }}
             className={cn('absolute top-full z-50 pt-5', align === 'left' ? '-left-6' : '-right-24')}
           >
-            <div className="grid w-[46rem] grid-cols-[1fr_1fr_13rem] gap-4 border border-primary-200/70 bg-ivory p-4 shadow-[0_40px_80px_-30px_rgba(8,38,32,0.45)]">
-              {PROJECT_PAGES.map((p) => (
+            <div className="grid w-[46rem] grid-cols-[1fr_13rem] gap-4 border border-primary-200/70 bg-ivory p-4 shadow-[0_40px_80px_-30px_rgba(8,38,32,0.45)]">
+              <div className={cn('grid grid-cols-2 gap-4', shown.length > 2 && 'max-h-[70vh] overflow-y-auto')}>
+              {shown.map((p) => (
                 <Link key={p.slug} to={projectPath(p.slug)} className="group block bg-white p-2.5 transition-shadow hover:shadow-soft">
                   <span className="relative block aspect-[4/3] overflow-hidden bg-navy-100">
                     <img src={p.card.sm} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                    <span className="absolute left-2 top-2 bg-ivory px-2 py-1 text-[9.5px] font-bold uppercase tracking-[0.2em] text-navy-900">Current</span>
+                    <span className="absolute left-2 top-2 bg-ivory px-2 py-1 text-[9.5px] font-bold uppercase tracking-[0.2em] text-navy-900">{p.live ? p.status.replace(' project', '') : 'Current'}</span>
                   </span>
                   <span className="mt-3 flex items-start justify-between gap-2 px-1">
                     <span>
                       <span className="block font-serif text-lg leading-tight text-navy-950">{p.name}</span>
-                      <span className="mt-1 block text-[12px] text-slate-500">{p.location.split(' · ')[0]}</span>
+                      <span className="mt-1 block text-[12px] text-slate-500">{(p.location || '').split(' · ')[0]}</span>
                     </span>
                     <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-primary-600 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                   </span>
-                  <span className="mt-2 flex items-center gap-1.5 px-1 pb-1 text-[10.5px] font-semibold text-slate-500">
-                    <BadgeCheck className="h-3.5 w-3.5 text-primary-600" /> RERA {p.rera}
-                  </span>
+                  {p.rera && (
+                    <span className="mt-2 flex items-center gap-1.5 px-1 pb-1 text-[10.5px] font-semibold text-slate-500">
+                      <BadgeCheck className="h-3.5 w-3.5 text-primary-600" /> RERA {p.rera}
+                    </span>
+                  )}
                 </Link>
               ))}
+              </div>
               <ul className="flex flex-col border-l border-primary-200/70 pl-4">
                 <li className="pb-2 text-[10px] font-bold uppercase tracking-[0.3em] text-primary-700">Discover</li>
                 {EXTRA.map(({ to, label, icon: Icon }) => (

@@ -4,7 +4,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Menu, X, ArrowRight, Phone, LayoutGrid } from 'lucide-react';
 import ExploreMenu from '@/features/explore/ExploreMenu';
 import ProjectsMenu from './ProjectsMenu';
-import { PROJECT_PAGES, projectPath } from '@/data/projectPages';
+import { projectPath } from '@/data/projectPages';
+import { useProjectList } from '@/data/liveProjects';
 import { CHAPTERS, chapterPath } from '@/features/explore/chapters';
 import ChapterVisual from '@/features/explore/ChapterVisual';
 import Logo from '@/components/common/Logo';
@@ -62,6 +63,7 @@ function ExploreButton({ onClick }) {
 
 export default function Navbar() {
   const [exploring, setExploring] = useState(false);
+  const projects = useProjectList();
   const scrolled = useScrolled(40);
   const { pathname } = useLocation();
   const isOpen = useUiStore((s) => s.isMobileMenuOpen);
@@ -144,12 +146,12 @@ export default function Navbar() {
                   </NavLink>
                   {link.to === '/projects' && (
                     <div className="mb-4 ml-11 grid gap-2">
-                      {PROJECT_PAGES.map((p) => (
+                      {projects.map((p) => (
                         <NavLink key={p.slug} to={projectPath(p.slug)} className="flex items-center gap-3">
                           <img src={p.card.sm} alt="" loading="lazy" className="h-11 w-16 object-cover" />
                           <span>
                             <span className="block font-serif text-lg leading-tight text-navy-950">{p.name}</span>
-                            <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700">Current project</span>
+                            <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700">{p.live ? p.status : 'Current project'}</span>
                           </span>
                         </NavLink>
                       ))}

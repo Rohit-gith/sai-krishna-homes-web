@@ -38,5 +38,7 @@ export const useAuthStore = create((set) => ({
 
 // any API call that finds the session expired logs the admin out
 if (typeof window !== 'undefined') {
-  window.addEventListener('skh:session-expired', () => useAuthStore.setState({ user: null, checked: true }));
+  window.addEventListener('skh:session-expired', () =>
+    useAuthStore.setState({ user: null, checked: true }),
+  );
 }

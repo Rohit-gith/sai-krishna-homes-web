@@ -39,10 +39,17 @@ export default function CommitDealModal({ open, onClose, lead, initialResult = '
     if (result === 'won' && !(Number(value) > 0)) return setErr('Enter the final deal value');
     if (!confirm) return setErr('Tick the box to confirm. A committed deal is locked.');
     setBusy(true);
-    const ok = await commit(lead.id, result === 'won' ? { result, value: Number(value), unit, note } : { result, reason, note });
+    const ok = await commit(
+      lead.id,
+      result === 'won' ? { result, value: Number(value), unit, note } : { result, reason, note },
+    );
     setBusy(false);
     if (!ok) return undefined;
-    toast(result === 'won' ? `${lead.id} committed as WON · ${inr(value)}` : `${lead.id} committed as LOST`);
+    toast(
+      result === 'won'
+        ? `${lead.id} committed as WON · ${inr(value)}`
+        : `${lead.id} committed as LOST`,
+    );
     onClose();
     return undefined;
   };
@@ -60,7 +67,10 @@ export default function CommitDealModal({ open, onClose, lead, initialResult = '
               type="button"
               onClick={() => setResult(id)}
               aria-pressed={result === id}
-              className={cn('flex items-center justify-center gap-2 rounded-xl border-2 py-3 font-semibold', result === id ? on : 'border-slate-200 text-slate-600')}
+              className={cn(
+                'flex items-center justify-center gap-2 rounded-xl border-2 py-3 font-semibold',
+                result === id ? on : 'border-slate-200 text-slate-600',
+              )}
             >
               <Icon className="h-5 w-5" /> {label}
             </button>
@@ -70,33 +80,62 @@ export default function CommitDealModal({ open, onClose, lead, initialResult = '
         {result === 'won' ? (
           <>
             <Field label="Final deal value (₹)" required>
-              <input className={fieldCls} value={value} onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))} inputMode="numeric" />
-              {Number(value) > 0 && <span className="mt-1 block text-xs text-slate-500">{inr(value)}</span>}
+              <input
+                className={fieldCls}
+                value={value}
+                onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
+                inputMode="numeric"
+              />
+              {Number(value) > 0 && (
+                <span className="mt-1 block text-xs text-slate-500">{inr(value)}</span>
+              )}
             </Field>
             <Field label="Unit / flat">
-              <input className={fieldCls} value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. Tower B · 304" />
+              <input
+                className={fieldCls}
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                placeholder="e.g. Tower B · 304"
+              />
             </Field>
           </>
         ) : (
           <Field label="Reason lost" required>
             <select className={fieldCls} value={reason} onChange={(e) => setReason(e.target.value)}>
-              {LOST_REASONS.map((r) => <option key={r}>{r}</option>)}
+              {LOST_REASONS.map((r) => (
+                <option key={r}>{r}</option>
+              ))}
             </select>
           </Field>
         )}
         <Field label="Note">
-          <textarea className={fieldCls} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+          <textarea
+            className={fieldCls}
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
         </Field>
 
         <label className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm text-navy-900">
-          <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} className="mt-0.5 h-4 w-4 accent-emerald-700" />
-          I confirm this deal is {result === 'won' ? 'won' : 'lost'}. Committing locks the lead (it can be reopened later).
+          <input
+            type="checkbox"
+            checked={confirm}
+            onChange={(e) => setConfirm(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-emerald-700"
+          />
+          I confirm this deal is {result === 'won' ? 'won' : 'lost'}. Committing locks the lead (it
+          can be reopened later).
         </label>
         {err && <p className="text-sm font-medium text-rose-600">{err}</p>}
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Btn variant="outline" onClick={onClose}>Cancel</Btn>
-          <Btn type="submit" disabled={busy} variant={result === 'won' ? 'success' : 'danger'}>Commit as {result === 'won' ? 'Won' : 'Lost'}</Btn>
+          <Btn variant="outline" onClick={onClose}>
+            Cancel
+          </Btn>
+          <Btn type="submit" disabled={busy} variant={result === 'won' ? 'success' : 'danger'}>
+            Commit as {result === 'won' ? 'Won' : 'Lost'}
+          </Btn>
         </div>
       </form>
     </Modal>

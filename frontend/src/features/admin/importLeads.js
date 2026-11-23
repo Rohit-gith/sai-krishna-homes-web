@@ -54,7 +54,10 @@ function sniffMap(rows) {
     }
   };
   pick('phone', (v) => String(v).replace(/\D/g, '').length >= 10);
-  pick('date', (v) => v instanceof Date || /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(String(v).trim()));
+  pick(
+    'date',
+    (v) => v instanceof Date || /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(String(v).trim()),
+  );
   pick('config', (v) => /bhk|studio/i.test(String(v)));
   pick('price', (v) => /lac|lakh|crore|cr\b/i.test(String(v)));
   pick('name', (v) => typeof v === 'string' && /[a-z]/i.test(v) && v.length < 40);
@@ -78,14 +81,18 @@ export function cleanConfig(v) {
   const s = String(v ?? '');
   const found = [...s.matchAll(/(\d)\s*(\+?)\s*bhk/gi)].map((m) => `${m[1]}${m[2]} BHK`);
   if (/studio/i.test(s)) found.unshift('Studio');
-  const uniq = [...new Set(found)].sort((a, b) => (a === 'Studio' ? -1 : b === 'Studio' ? 1 : a.localeCompare(b)));
+  const uniq = [...new Set(found)].sort((a, b) =>
+    a === 'Studio' ? -1 : b === 'Studio' ? 1 : a.localeCompare(b),
+  );
   return uniq.join(', ') || s.trim();
 }
 
 const AMOUNT = /([\d.]+)\s*(lac|lakh|l\b|crore|cr\b)/gi;
 export function parsePrice(v) {
   const s = String(v ?? '');
-  const nums = [...s.matchAll(AMOUNT)].map((m) => parseFloat(m[1]) * (/^c/i.test(m[2]) ? 1e7 : 1e5));
+  const nums = [...s.matchAll(AMOUNT)].map(
+    (m) => parseFloat(m[1]) * (/^c/i.test(m[2]) ? 1e7 : 1e5),
+  );
   if (!nums.length) return { priceMin: 0, priceMax: 0 };
   return { priceMin: Math.round(Math.min(...nums)), priceMax: Math.round(Math.max(...nums)) };
 }
@@ -108,7 +115,9 @@ function parseDate(v) {
     // Excel dates arrive as UTC midnight; keep the calendar day in local time.
     return fixSwapped(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate()).toISOString();
   }
-  const m = String(v ?? '').trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  const m = String(v ?? '')
+    .trim()
+    .match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
   if (m) {
     const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
     return new Date(y, Number(m[2]) - 1, Number(m[1]), 11).toISOString();
@@ -125,7 +134,11 @@ const isBlank = (r) => r.every((c) => c === null || String(c).trim() === '');
 export async function parseLeadsWorkbook(file) {
   const names = await readSheetNames(file);
   const raw = [];
-  for (const name of names) raw.push({ name, rows: (await readXlsxFile(file, { sheet: name })).filter((r) => !isBlank(r)) });
+  for (const name of names)
+    raw.push({
+      name,
+      rows: (await readXlsxFile(file, { sheet: name })).filter((r) => !isBlank(r)),
+    });
 
   // A header from any sheet can be reused by header-less sheets with the same width.
   const known = raw.map((s) => (s.rows.length ? headerMap(s.rows[0]) : null));
@@ -135,7 +148,8 @@ export async function parseLeadsWorkbook(file) {
   const sheets = raw.map((s, si) => {
     if (!s.rows.length) return { name: s.name, rows: [], headerless: false };
     const own = known[si];
-    const map = own || (template && s.rows[0].length === templateWidth ? template : sniffMap(s.rows));
+    const map =
+      own || (template && s.rows[0].length === templateWidth ? template : sniffMap(s.rows));
     const data = own ? s.rows.slice(1) : s.rows;
     const rows = data.map((r, i) => {
       const phone = cleanPhone(r[map.phone]);

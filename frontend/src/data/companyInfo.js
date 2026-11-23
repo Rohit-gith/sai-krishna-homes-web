@@ -3,7 +3,7 @@
  * Update here once and it changes everywhere.
  */
 export const COMPANY = {
-  name: 'Sai Krishna Homes Pvt. Ltd.',
+  name: 'Saikrishna Homes Pvt. Ltd.',
   shortName: 'Sai Krishna Homes',
   tagline: 'We shape the essence of living.',
   established: '2010',

@@ -1,7 +1,7 @@
 /** Editable content for the Sai Krishna Homes landing page. */
 export const SK = {
   name: 'Sai Krishna Homes',
-  legalName: 'Sai Krishna Homes Pvt. Ltd.',
+  legalName: 'Saikrishna Homes Pvt. Ltd.',
   established: 2010,
   city: 'Bhubaneswar, Odisha',
   phone: '9178255757',

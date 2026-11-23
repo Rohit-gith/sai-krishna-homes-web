@@ -33,14 +33,64 @@ async function ensureIndexes(db) {
     db.collection('admins').createIndex({ email: 1 }, { unique: true }),
     db.collection('leads').createIndex({ id: 1 }, { unique: true }),
     db.collection('leads').createIndex({ createdAt: -1 }),
+    db.collection('leads_trash').createIndex({ id: 1 }),
+    db.collection('leads_trash').createIndex({ 'deleted.at': -1 }),
     db.collection('enquiries').createIndex({ id: 1 }, { unique: true }),
     db.collection('enquiries').createIndex({ at: -1 }),
     // rate-limit hits expire on their own
     db.collection('ratelimits').createIndex({ at: 1 }, { expireAfterSeconds: 3600 }),
     db.collection('ratelimits').createIndex({ key: 1, at: -1 }),
     db.collection('activity').createIndex({ at: -1 }),
+    db.collection('visits').createIndex({ id: 1 }, { unique: true }),
+    db.collection('visits').createIndex({ at: -1 }),
+    db.collection('visits').createIndex({ 'guide.email': 1, at: -1 }),
+    db.collection('visits').createIndex({ phone: 1 }),
+    db.collection('leads').createIndex({ phone: 1 }),
     db.collection('activity').createIndex({ email: 1, at: -1 }),
+    db.collection('activity').createIndex({ email: 1, deviceId: 1, type: 1 }),
   ]);
+  await runOnce(db);
+}
+
+/*
+ * One-time data updates. Each runs once per database (a marker is kept in the "migrations"
+ * collection), so a later choice by the owner is never overwritten.
+ */
+async function runOnce(db) {
+  const done = db.collection('migrations');
+  const once = async (id, fn) => {
+    // claim it first: only one server instance runs it, even if several start together
+    const claimed = await done.updateOne({ _id: id }, { $setOnInsert: { at: new Date().toISOString() } }, { upsert: true });
+    if (!claimed.upsertedCount) return;
+    const result = await fn();
+    await done.updateOne({ _id: id }, { $set: { result } });
+  };
+  // 2026-11-23: website enquiries became a default for sales and site-visit executives; give it to
+  // the team members who already existed. The owner can take it away from anyone afterwards.
+  await once('enquiries-default-for-staff', async () => {
+    const at = new Date().toISOString();
+    const r = await db.collection('admins').updateMany(
+      { role: { $in: ['sales', 'site_visit'] }, permissions: { $ne: 'enquiries.view' } },
+      {
+        $addToSet: { permissions: 'enquiries.view' },
+        $push: {
+          history: {
+            $each: [
+              {
+                at,
+                by: { email: 'script', name: 'System' },
+                action: 'updated',
+                changes: { permissions: { added: ['enquiries.view'], removed: [] } },
+                note: 'Website enquiries are now shown to every team member by default',
+              },
+            ],
+            $position: 0,
+          },
+        },
+      },
+    );
+    return { updated: r.modifiedCount };
+  });
 }
 
 /** Next number in a named sequence (lead IDs SKH-0001, SKH-0002 …), safe under concurrent requests. */

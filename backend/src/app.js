@@ -4,6 +4,10 @@ import authRoutes from './routes/auth.js';
 import enquiryRoutes from './routes/enquiries.js';
 import leadRoutes from './routes/leads.js';
 import activityRoutes from './routes/activity.js';
+import userRoutes from './routes/users.js';
+import visitRoutes from './routes/visits.js';
+import reportRoutes from './routes/reports.js';
+import projectRoutes, { publicProjects } from './routes/projects.js';
 import { sameOrigin } from './security.js';
 
 /** The whole API. Runs on Vercel as one serverless function (api/index.js) and locally via server/dev.js. */
@@ -11,7 +15,7 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', true);
 
-app.use(express.json({ limit: '5mb' })); // Excel imports can be a few hundred rows
+app.use(express.json({ limit: '5mb' })); // Excel imports, project photos (shrunk in the browser first)
 app.use(cookieParser());
 app.use((_req, res, next) => {
   res.set('Cache-Control', 'no-store');
@@ -25,6 +29,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/visits', visitRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/public', publicProjects); // the website's own project pages (no login)
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 
