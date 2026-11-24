@@ -6,6 +6,7 @@ import { fieldCls } from '@/features/admin/components/ui';
 import logoImg from '@/assets/logo/logo.png';
 import { PHOTOS, responsive } from '@/data/projects';
 import { useForceDay } from '@/features/admin/useForceDay';
+import { setupCrmApp } from '@/features/admin/pwa';
 
 export default function LoginPage() {
   const user = useAuthStore((s) => s.user);
@@ -23,6 +24,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     document.title = 'Admin login | Sai Krishna Homes';
+    setupCrmApp(); // the CRM can be installed from the login page too
     if (!checked) check(); // already signed in on this device? skip the form
   }, [checked, check]);
 

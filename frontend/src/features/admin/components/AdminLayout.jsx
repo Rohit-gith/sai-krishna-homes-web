@@ -28,6 +28,7 @@ import PageLoader from '@/components/common/PageLoader';
 import logoImg from '@/assets/logo/logo.png';
 import { cn } from '@/utils/cn';
 import { useForceDay } from '../useForceDay';
+import { setupCrmApp } from '../pwa';
 
 // show: who sees the link (the pages themselves are protected too, and the server checks everything)
 const NAV = [
@@ -186,6 +187,9 @@ export default function AdminLayout() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   useForceDay();
+
+  // installable as an app + notifications, only inside the CRM
+  useEffect(() => setupCrmApp(), []);
 
   // ask the server who is logged in, then fetch the CRM data once
   useEffect(() => {

@@ -1,0 +1,17 @@
+{
+  "id": "/admin",
+  "name": "Sai Krishna Homes CRM",
+  "short_name": "SKH CRM",
+  "description": "Leads, site visits, website enquiries and team for Sai Krishna Homes.",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b2f28",
+  "theme_color": "#0E3B32",
+  "icons": [
+    { "src": "/app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/app/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

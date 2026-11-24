@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '@/services/crmApi';
+import { disablePush } from '../pwa';
 
 /**
  * Admin session. The real session is an httpOnly cookie set by the backend (8 hours); this store only
@@ -31,6 +32,8 @@ export const useAuthStore = create((set) => ({
   },
 
   logout: async () => {
+    // this device stops getting the person's notifications before the session ends
+    await disablePush('logout').catch(() => {});
     set({ user: null });
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
   },

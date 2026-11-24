@@ -799,7 +799,9 @@ export const ACTIVITY_LABEL = {
   leads_exported: 'Leads exported',
   leads_deleted: 'Leads deleted (recycle bin)',
   leads_restored: 'Leads restored',
-  leads_purged: 'Leads removed for good',
+  leads_purged: 'Leads deleted forever',
+  leads_archive_restored: 'Restored from the archive (Fidelsya)',
+  leads_archive_purged: 'Removed from the archive (Fidelsya)',
   leads_handed_over: 'Leads handed over',
   enquiry_received: 'Website enquiry received',
   enquiry_deleted: 'Website enquiry deleted',
@@ -820,6 +822,8 @@ export const ACTIVITY_LABEL = {
   project_deleted: 'Project deleted',
   project_published: 'Project shown on website',
   project_unpublished: 'Project hidden from website',
+  lead_duplicate_added: 'Duplicate lead added anyway',
+  deal_value_confirmed: 'Unusual deal value confirmed',
 };
 
 /** Human wording for a permission / role change record. */

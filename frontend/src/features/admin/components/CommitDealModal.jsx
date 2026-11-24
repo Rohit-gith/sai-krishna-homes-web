@@ -4,7 +4,8 @@ import { Modal, Field, Btn, fieldCls } from './ui';
 import { LOST_REASONS } from '../constants';
 import { useCrmStore } from '../store/useCrmStore';
 import { useUiStore } from '@/store/useUiStore';
-import { inr } from '../utils';
+import { inr, lakhCrore } from '../utils';
+import { ValueNotice } from './leadChecks';
 import { cn } from '@/utils/cn';
 
 /** Close a deal as Won (final value + unit) or Lost (reason). Confirming "commits" and locks it. */
@@ -19,6 +20,8 @@ export default function CommitDealModal({ open, onClose, lead, initialResult = '
   const [confirm, setConfirm] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [valueProblem, setValueProblem] = useState(null); // the server thinks the value looks wrong
+  const [valueOk, setValueOk] = useState(false); // "yes, this value is correct"
 
   useEffect(() => {
     if (!open || !lead) return;
@@ -29,6 +32,8 @@ export default function CommitDealModal({ open, onClose, lead, initialResult = '
     setNote('');
     setConfirm(false);
     setErr('');
+    setValueProblem(null);
+    setValueOk(false);
   }, [open, lead, initialResult]);
 
   if (!lead) return null;
@@ -37,14 +42,31 @@ export default function CommitDealModal({ open, onClose, lead, initialResult = '
     e.preventDefault();
     if (busy) return undefined;
     if (result === 'won' && !(Number(value) > 0)) return setErr('Enter the final deal value');
+    if (result === 'won' && valueProblem && !(valueProblem.canConfirm && valueOk))
+      return setErr('Check the deal value above.');
     if (!confirm) return setErr('Tick the box to confirm. A committed deal is locked.');
     setBusy(true);
     const ok = await commit(
       lead.id,
-      result === 'won' ? { result, value: Number(value), unit, note } : { result, reason, note },
+      result === 'won'
+        ? {
+            result,
+            value: Number(value),
+            unit,
+            note,
+            ...(valueProblem && valueOk ? { confirmValue: true } : {}),
+          }
+        : { result, reason, note },
     );
     setBusy(false);
     if (!ok) return undefined;
+    if (ok.problem) {
+      // looks like a typo: show why, and let them correct it or confirm it
+      setValueProblem(ok.problem);
+      setValueOk(false);
+      setErr('');
+      return undefined;
+    }
     toast(
       result === 'won'
         ? `${lead.id} committed as WON · ${inr(value)}`
@@ -83,13 +105,20 @@ export default function CommitDealModal({ open, onClose, lead, initialResult = '
               <input
                 className={fieldCls}
                 value={value}
-                onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => {
+                  setValue(e.target.value.replace(/\D/g, ''));
+                  setValueProblem(null); // a new value is checked again
+                  setValueOk(false);
+                }}
                 inputMode="numeric"
               />
               {Number(value) > 0 && (
-                <span className="mt-1 block text-xs text-slate-500">{inr(value)}</span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  {inr(value)} · <b className="text-navy-900">{lakhCrore(value)}</b>
+                </span>
               )}
             </Field>
+            <ValueNotice problem={valueProblem} ok={valueOk} onOk={setValueOk} />
             <Field label="Unit / flat">
               <input
                 className={fieldCls}

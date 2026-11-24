@@ -1,5 +1,13 @@
 /** ₹ formatting: full Indian grouping, or compact lakh/crore. */
 export const inr = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
+/** "₹65 lakh" / "₹6.5 crore": the size of a number in words, so a missing or extra zero is easy to spot. */
+export const lakhCrore = (n) => {
+  const v = Number(n) || 0;
+  if (v >= 1e7) return `₹${+(v / 1e7).toFixed(2)} crore`;
+  if (v >= 1e5) return `₹${+(v / 1e5).toFixed(2)} lakh`;
+  if (v >= 1e3) return `₹${+(v / 1e3).toFixed(1)} thousand`;
+  return inr(v);
+};
 export const inrShort = (n) => {
   const v = Number(n) || 0;
   if (v >= 1e7) return `₹${(v / 1e7).toFixed(2)} Cr`;

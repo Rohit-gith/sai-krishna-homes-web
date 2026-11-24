@@ -8,6 +8,7 @@ import userRoutes from './routes/users.js';
 import visitRoutes from './routes/visits.js';
 import reportRoutes from './routes/reports.js';
 import projectRoutes, { publicProjects } from './routes/projects.js';
+import pushRoutes from './routes/push.js';
 import { sameOrigin } from './security.js';
 
 /** The whole API. Runs on Vercel as one serverless function (api/index.js) and locally via server/dev.js. */
@@ -33,6 +34,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/visits', visitRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/push', pushRoutes); // phone / desktop notifications
 app.use('/api/public', publicProjects); // the website's own project pages (no login)
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));

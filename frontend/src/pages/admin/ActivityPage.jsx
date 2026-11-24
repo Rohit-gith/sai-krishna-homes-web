@@ -39,7 +39,10 @@ const TONE = {
   visit_recorded: 'bg-teal-50 text-teal-700',
   visit_deleted: 'bg-rose-50 text-rose-700',
   leads_deleted: 'bg-rose-50 text-rose-700',
+  leads_purged: 'bg-rose-100 text-rose-800',
   enquiry_received: 'bg-primary-50 text-primary-800',
+  lead_duplicate_added: 'bg-amber-50 text-amber-800',
+  deal_value_confirmed: 'bg-violet-50 text-violet-700',
 };
 
 /** "Open SKH-0042 →" for entries about a lead. */
@@ -134,8 +137,8 @@ export default function ActivityPage() {
         >
           <option value="">Everything</option>
           {Object.entries(ACTIVITY_LABEL)
-            // only Fidelsya can remove leads for good, so only Fidelsya gets that filter
-            .filter(([id]) => id !== 'leads_purged' || fidelsya)
+            // the archive is Fidelsya's own: only Fidelsya gets those filters
+            .filter(([id]) => !id.startsWith('leads_archive_') || fidelsya)
             .map(([id, label]) => (
               <option key={id} value={id}>
                 {label}

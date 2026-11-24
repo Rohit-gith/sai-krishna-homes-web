@@ -480,7 +480,7 @@ describe('team: roles, permissions, active/inactive, passwords (Phase 1)', () =>
     await as(fid, `/api/leads/${l.id}/attempts`, { method: 'POST', body: { type: 'Call', outcome: 'connected', note: 'checked data' } });
     await as(fid, '/api/leads/status', { method: 'POST', body: { ids: [l.id], status: 'negotiation' } });
     await as(fid, '/api/leads/assign', { method: 'POST', body: { ids: [l.id], to: 'sam@test.in' } });
-    await as(fid, `/api/leads/${l.id}/commit`, { method: 'POST', body: { result: 'won', value: 100, unit: '', note: '' } });
+    await as(fid, `/api/leads/${l.id}/commit`, { method: 'POST', body: { result: 'won', value: 6500000, unit: '', note: '' } });
     const own = await as(fid, '/api/visits', { method: 'POST', body: { customerName: 'Fid Shown', phone: '9555000010', rating: 4 } });
     const forVic = await as(fid, '/api/visits', { method: 'POST', body: { customerName: 'For Vic', phone: '9555000009', rating: 5, guideEmail: 'vic@test.in' } });
     // the client sees the business data, but no "who" and no history from Fidelsya
@@ -620,8 +620,8 @@ describe('team: roles, permissions, active/inactive, passwords (Phase 1)', () =>
     assert.ok(lead);
     assert.equal(lead.attempts[0].note, 'keep me');
     assert.match(lead.history[0].text, /Restored from the recycle bin by Test Admin/);
-    // the owner can't remove for good; Fidelsya can
-    assert.equal((await as(owner, '/api/leads/trash/purge', { method: 'POST', body: { ids: [b.id] } })).status, 403);
+    // the owner must type DELETE; Fidelsya removes at once (no archive)
+    assert.equal((await as(owner, '/api/leads/trash/purge', { method: 'POST', body: { ids: [b.id] } })).status, 400);
     assert.equal((await as(fid, '/api/leads/trash/purge', { method: 'POST', body: { ids: [b.id] } })).body.purged, 1);
     assert.equal(await db.collection('leads_trash').countDocuments({ id: b.id }), 0);
     // Fidelsya's deletes never show in the client's bin
@@ -645,7 +645,7 @@ describe('team: roles, permissions, active/inactive, passwords (Phase 1)', () =>
     const o2 = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Lal Open 2', phone: '9555000312' } })).body;
     await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [o2.id], to: 'lal@test.in' } });
     const w = (await as(lal, '/api/leads', { method: 'POST', body: { name: 'Lal Won', phone: '9555000313' } })).body;
-    await as(lal, `/api/leads/${w.id}/commit`, { method: 'POST', body: { result: 'won', value: 500, unit: '', note: '' } });
+    await as(lal, `/api/leads/${w.id}/commit`, { method: 'POST', body: { result: 'won', value: 6500000, unit: '', note: '' } });
     // only owners
     assert.equal((await as(lal, '/api/leads/handover', { method: 'POST', body: { from: 'lal@test.in', to: 'tara@test.in' } })).status, 403);
     assert.equal((await as(owner, '/api/leads/handover', { method: 'POST', body: { from: 'lal@test.in', to: 'vic@test.in' } })).status, 400); // site visit can't take leads
@@ -877,5 +877,162 @@ describe('team: roles, permissions, active/inactive, passwords (Phase 1)', () =>
     const moved = await as(owner, `/api/users/${g.id}`, { method: 'PATCH', body: { role: 'sales' } });
     assert.ok(!moved.body.permissions.some((p) => ['team.manage', 'activity.view', 'projects.manage'].includes(p)));
     assert.ok(moved.body.permissions.includes('leads.view_all'));
+  });
+
+  test('duplicate lead: warned with who has it; "add anyway" is kept on the lead and in the log', async () => {
+    const neha = (await login('neha@test.in', 'NehaSales123')).ck; // sales, made by the CMO above (no "see all leads")
+    const first = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Dup Customer', phone: '9555000701' } })).body;
+    assert.equal(first.phoneKey, '9555000701');
+    await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [first.id], to: 'sam@test.in' } });
+    // the owner sees the lead itself
+    const chk = (await as(owner, '/api/leads/check-phone?phone=%2B91%2095550%2000701')).body.duplicates;
+    assert.equal(chk.length, 1);
+    assert.equal(chk[0].id, first.id);
+    assert.equal(chk[0].owner, 'Sam Sales');
+    // sales without "see all" only learns who has it, not the customer
+    const seen = (await as(neha, '/api/leads/check-phone?phone=9555000701')).body.duplicates[0];
+    assert.equal(seen.owner, 'Sam Sales');
+    assert.equal(seen.id, undefined);
+    assert.equal(seen.name, undefined);
+    // adding it again is stopped…
+    const again = await as(neha, '/api/leads', { method: 'POST', body: { name: 'Dup Again', phone: '9555000701' } });
+    assert.equal(again.status, 409);
+    assert.equal(again.body.code, 'duplicate');
+    // …unless they choose "add anyway": recorded on the lead and in the activity log
+    const anyway = await as(neha, '/api/leads', { method: 'POST', body: { name: 'Dup Again', phone: '9555000701', allowDuplicate: true } });
+    assert.equal(anyway.status, 201);
+    assert.deepEqual(anyway.body.duplicateOf, []); // neha can't see the other lead's id
+    assert.match(anyway.body.history[0].text, /already a lead: a lead \(with Sam Sales\)/);
+    const ownerView = (await as(owner, '/api/leads')).body.find((l) => l.id === anyway.body.id);
+    assert.ok(ownerView.duplicateNote);
+    assert.ok((await as(owner, '/api/activity?type=lead_duplicate_added')).body.some((a) => a.ref?.id === anyway.body.id));
+    // changing a lead's number to someone else's is checked too; its own number is not a duplicate
+    const other = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Other One', phone: '9555000702' } })).body;
+    assert.equal((await as(owner, `/api/leads/${other.id}`, { method: 'PATCH', body: { phone: '9555000701' } })).status, 409);
+    assert.equal((await as(owner, `/api/leads/${other.id}`, { method: 'PATCH', body: { phone: '9555000702', notes: 'same number' } })).status, 200);
+    // a deleted lead with the number is mentioned as "in the recycle bin"
+    await as(owner, '/api/leads/delete', { method: 'POST', body: { ids: [other.id] } });
+    const binned = (await as(owner, '/api/leads/check-phone?phone=9555000702')).body.duplicates;
+    assert.equal(binned[0].inBin, true);
+    // Excel import never stops, but marks possible duplicates
+    const imp = (await as(owner, '/api/leads/import', { method: 'POST', body: { drafts: [{ name: 'Imp Dup', phone: '+91 95550 00701' }, { name: 'Imp New', phone: '9555000703' }] } })).body;
+    assert.ok(imp.find((l) => l.name === 'Imp Dup').duplicateOf.includes(first.id));
+    assert.equal(imp.find((l) => l.name === 'Imp New').duplicateOf, undefined);
+  });
+
+  test('deal value check: odd values need a "yes, correct"; impossible ones only the owner / Management can confirm', async () => {
+    const mk = async (body) => (await as(owner, '/api/leads', { method: 'POST', body: { allowDuplicate: true, ...body } })).body;
+    const commit = (ck, id, value, extra = {}) =>
+      as(ck, `/api/leads/${id}/commit`, { method: 'POST', body: { result: 'won', value, unit: 'B-1', note: '', ...extra } });
+    await as(owner, '/api/users', { method: 'POST', body: { name: 'Vee Sales', email: 'vee@test.in', role: 'sales', password: 'VeeSales1234' } });
+    const vee = (await login('vee@test.in', 'VeeSales1234')).ck; // default sales permissions (can close deals)
+    // a normal value just goes through
+    const ok = await mk({ name: 'Value Ok', phone: '9555000801', budget: 6000000 });
+    assert.equal((await commit(owner, ok.id, 6500000)).status, 200);
+    // 10× the budget (₹6.5 crore for a ₹60 lakh budget): needs a confirmation
+    const odd = await mk({ name: 'Value Odd', phone: '9555000802', budget: 6000000 });
+    await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [odd.id], to: 'vee@test.in' } });
+    const w = await commit(vee, odd.id, 65000000);
+    assert.equal(w.status, 422);
+    assert.equal(w.body.code, 'value_check');
+    assert.equal(w.body.canConfirm, true);
+    assert.match(w.body.check.reasons.join(' '), /budget/);
+    const yes = await commit(vee, odd.id, 65000000, { confirmValue: true });
+    assert.equal(yes.status, 200);
+    assert.equal(yes.body.status, 'won');
+    assert.equal(yes.body.valueCheck.value, 65000000);
+    assert.equal(yes.body.valueCheck.confirmedBy.email, 'vee@test.in');
+    assert.ok((await as(owner, '/api/activity?type=deal_value_confirmed')).body.some((a) => a.ref?.id === odd.id && a.email === 'vee@test.in'));
+    // ₹650 crore: impossible → sales can't confirm, the owner can
+    const typo = await mk({ name: 'Value Typo', phone: '9555000803' });
+    await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [typo.id], to: 'vee@test.in' } });
+    const blocked = await commit(vee, typo.id, 6500000000, { confirmValue: true });
+    assert.equal(blocked.status, 422);
+    assert.equal(blocked.body.canConfirm, false);
+    assert.equal((await commit(owner, typo.id, 6500000000, { confirmValue: true })).status, 200);
+    // editing the expected value is checked the same way
+    const ed = await mk({ name: 'Value Edit', phone: '9555000804' });
+    assert.equal((await as(owner, `/api/leads/${ed.id}`, { method: 'PATCH', body: { dealValue: 500 } })).status, 422);
+    const fixed = await as(owner, `/api/leads/${ed.id}`, { method: 'PATCH', body: { dealValue: 500, confirmValue: true } });
+    assert.equal(fixed.status, 200);
+    assert.equal(fixed.body.valueCheck.level, 'block');
+    assert.equal((await as(owner, `/api/leads/${ed.id}`, { method: 'PATCH', body: { dealValue: 4500000 } })).status, 200);
+  });
+
+  test('"Delete forever": owner only (typing DELETE); kept 120 days in an archive only Fidelsya sees', async () => {
+    const db = await getDb();
+    const mk = async (name, phone) => (await as(owner, '/api/leads', { method: 'POST', body: { name, phone, allowDuplicate: true } })).body;
+    const x = await mk('Forever One', '9555000901');
+    const y = await mk('Forever Two', '9555000902');
+    const z = await mk('Fid Deleted', '9555000903');
+    await as(owner, '/api/leads/delete', { method: 'POST', body: { ids: [x.id, y.id] } });
+    await as(fid, '/api/leads/delete', { method: 'POST', body: { ids: [z.id] } });
+    // nobody else: not Management, not sales
+    const cmo = (await login('cmo@test.in', 'Fresh123456')).ck;
+    assert.equal((await as(cmo, '/api/leads/trash/purge', { method: 'POST', body: { ids: [x.id], confirm: 'DELETE' } })).status, 403);
+    assert.equal((await as(sales, '/api/leads/trash/purge', { method: 'POST', body: { ids: [x.id], confirm: 'DELETE' } })).status, 403);
+    // the owner must type DELETE exactly
+    assert.equal((await as(owner, '/api/leads/trash/purge', { method: 'POST', body: { ids: [x.id], confirm: 'delete' } })).status, 400);
+    // a lead Fidelsya deleted can't be touched by the owner
+    const zr = await as(owner, '/api/leads/trash/purge', { method: 'POST', body: { ids: [z.id], confirm: 'DELETE' } });
+    assert.equal(zr.body.purged, 0, JSON.stringify(zr));
+    assert.equal(await db.collection('leads_trash').countDocuments({ id: z.id }), 1);
+    const gone = await as(owner, '/api/leads/trash/purge', { method: 'POST', body: { ids: [x.id, y.id], confirm: 'DELETE' } });
+    assert.equal(gone.body.purged, 2);
+    // gone for the client…
+    assert.ok(!(await as(owner, '/api/leads/trash')).body.some((l) => [x.id, y.id].includes(l.id)));
+    assert.ok(!(await as(owner, '/api/leads')).body.some((l) => [x.id, y.id].includes(l.id)));
+    assert.equal((await as(owner, '/api/leads/archive')).status, 403);
+    // …recorded with who, how many, the IDs and names (owner and Fidelsya both see it)
+    const entry = (await as(owner, '/api/activity?type=leads_purged')).body.find((a) => a.note.includes(x.id));
+    assert.equal(entry.email, 'admin@test.in');
+    assert.match(entry.note, /2 lead\(s\) deleted forever: .*Forever One.*Forever Two/);
+    assert.ok((await as(fid, '/api/activity?type=leads_purged')).body.some((a) => a.note.includes(x.id)));
+    // …but Fidelsya still has them for 120 days
+    const arc = (await as(fid, '/api/leads/archive')).body;
+    const ax = arc.find((l) => l.id === x.id);
+    assert.ok(ax);
+    const days = (Date.parse(ax.archived.expireAt) - Date.parse(ax.archived.at)) / 864e5;
+    assert.equal(Math.round(days), 120);
+    assert.equal(ax.archived.by.email, 'admin@test.in');
+    // Fidelsya brings one back (the client sees it again, without Fidelsya's name) and removes the other
+    assert.equal((await as(fid, '/api/leads/archive/restore', { method: 'POST', body: { ids: [x.id] } })).status, 200);
+    const back = (await as(owner, '/api/leads')).body.find((l) => l.id === x.id);
+    assert.ok(back);
+    assert.ok(!JSON.stringify(back.history).includes('Support'));
+    assert.equal((await as(fid, '/api/leads/archive/purge', { method: 'POST', body: { ids: [y.id] } })).body.purged, 1);
+    assert.equal(await db.collection('leads_archive').countDocuments({ id: { $in: [x.id, y.id] } }), 0);
+    // MongoDB removes archive entries by itself when they expire
+    const ttl = (await db.collection('leads_archive').indexes()).find((i) => i.key['archived.expireAt']);
+    assert.equal(ttl.expireAfterSeconds, 0);
+    // Fidelsya's archive work stays hidden from the client
+    const ownerLog = (await as(owner, '/api/activity?limit=2000')).body;
+    assert.ok(!ownerLog.some((a) => a.type === 'leads_archive_restored' || a.type === 'leads_archive_purged'));
+  });
+
+  test('notifications: a device is saved for the signed-in person, removed on turn-off / logout, all logged', async () => {
+    const db = await getDb();
+    const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/test-device-1', expirationTime: null, keys: { p256dh: 'BPx'.padEnd(87, 'a'), auth: 'authsecret12345' } };
+    assert.equal((await as('', '/api/push/key')).status, 401); // login needed
+    assert.equal(typeof (await as(owner, '/api/push/key')).body.publicKey, 'string');
+    assert.equal((await as(owner, '/api/push/subscribe', { method: 'POST', body: { subscription: { endpoint: 'not a url' } } })).status, 400);
+    assert.equal((await as(owner, '/api/push/subscribe', { method: 'POST', body: { subscription: sub }, headers: { 'X-Device-Id': 'abcdefabcdef' } })).status, 200);
+    const saved = await db.collection('push_subscriptions').findOne({ endpoint: sub.endpoint });
+    assert.equal(saved.email, 'admin@test.in');
+    assert.equal(saved.deviceId, 'abcdefabcdef');
+    // the same browser again: still one record
+    await as(owner, '/api/push/subscribe', { method: 'POST', body: { subscription: sub } });
+    assert.equal(await db.collection('push_subscriptions').countDocuments({ endpoint: sub.endpoint }), 1);
+    // someone else can't remove my device
+    await as(sales, '/api/push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint } });
+    assert.equal(await db.collection('push_subscriptions').countDocuments({ endpoint: sub.endpoint }), 1);
+    // logout on this device removes it
+    assert.equal((await as(owner, '/api/push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint, reason: 'logout' } })).status, 200);
+    assert.equal(await db.collection('push_subscriptions').countDocuments({ endpoint: sub.endpoint }), 0);
+    const log = (await as(owner, '/api/activity?email=admin@test.in&limit=50')).body;
+    assert.ok(log.some((a) => a.type === 'push_enabled'));
+    assert.ok(log.some((a) => a.type === 'push_disabled' && /Logged out/.test(a.note)));
+    // a website enquiry still works when notifications are not set up on the server (tests have no keys)
+    assert.equal((await call('/api/enquiries', { method: 'POST', body: enquiry({ name: 'Push Visitor', phone: '9876500999' }), auth: false, headers: { 'X-Forwarded-For': '10.0.0.91' } })).status, 201);
   });
 });

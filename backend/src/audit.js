@@ -26,7 +26,11 @@ export const ACTIVITY = {
   PROJECT_UNPUBLISHED: 'project_unpublished', // taken off the website
   LEADS_DELETED: 'leads_deleted', // moved to the recycle bin
   LEADS_RESTORED: 'leads_restored',
-  LEADS_PURGED: 'leads_purged', // removed for good (Fidelsya only)
+  LEADS_PURGED: 'leads_purged', // "Delete forever" from the recycle bin (owner, or Fidelsya)
+  LEADS_ARCHIVE_RESTORED: 'leads_archive_restored', // Fidelsya brought back a lead the owner deleted forever
+  LEADS_ARCHIVE_PURGED: 'leads_archive_purged', // Fidelsya removed it from the archive for good
+  PUSH_ENABLED: 'push_enabled', // phone / desktop notifications turned on for a device
+  PUSH_DISABLED: 'push_disabled',
   LEADS_HANDED_OVER: 'leads_handed_over', // all open leads of one person given to another
   ENQUIRY_RECEIVED: 'enquiry_received', // a visitor filled a form on the website
   ENQUIRY_DELETED: 'enquiry_deleted',
@@ -43,6 +47,8 @@ export const ACTIVITY = {
   VISIT_RECORDED: 'visit_recorded',
   VISIT_UPDATED: 'visit_updated',
   VISIT_DELETED: 'visit_deleted',
+  LEAD_DUPLICATE_ADDED: 'lead_duplicate_added', // added although the mobile number is already a lead
+  DEAL_VALUE_CONFIRMED: 'deal_value_confirmed', // a deal value that looked wrong, confirmed as correct
 };
 
 /** The browser's own ID (made once per browser by the CRM, sent as X-Device-Id), so two devices on one WiFi still look different. */

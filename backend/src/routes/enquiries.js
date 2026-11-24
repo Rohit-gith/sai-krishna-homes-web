@@ -5,6 +5,7 @@ import { ACTIVITY, logActivity } from '../audit.js';
 import { getDb } from '../db.js';
 import { can } from '../permissions.js';
 import { sendLeadAlert } from '../mail.js';
+import { notifyEnquiry } from '../push.js';
 import { clientIp, rateLimit, requireAdmin, requirePerm } from '../security.js';
 
 const admin = [requireAdmin, requirePerm('enquiries.view')];
@@ -58,6 +59,9 @@ r.post('/', async (req, res) => {
     req,
     note: [data.form, `+91 ${data.phone}`, data.interest, website && 'possible spam'].filter(Boolean).join(' · '),
   });
+
+  // a notification on the phones / laptops of everyone who sees website enquiries (not for likely spam)
+  if (!website) await notifyEnquiry(db, enquiry);
 
   // email the owner; a mail problem must never lose the enquiry
   let mailed = false;

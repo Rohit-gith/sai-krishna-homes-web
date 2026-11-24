@@ -6,6 +6,7 @@ import { getDb, nextSeq } from '../db.js';
 import { can } from '../permissions.js';
 import { requireAdmin, requirePerm } from '../security.js';
 import { cleanLead, hideFidelsya, isFidelsya, mark } from '../clientView.js';
+import { checkDealValue, duplicateLine, findDuplicates, mayOverrideValue, phoneKey } from '../leadChecks.js';
 
 /*
  * The CRM. Same lead shape and the same rules the admin panel used when it lived in the browser
@@ -81,6 +82,60 @@ async function change(req, id, set, text, extra = {}) {
   );
 }
 
+/**
+ * Is this mobile number already a lead? Used while typing in the lead form.
+ * Staff without "See all leads" only learn who has the customer (not the customer's details).
+ */
+r.get('/check-phone', async (req, res) => {
+  if (!can(req.admin, 'leads.create') && !can(req.admin, 'leads.edit')) return res.status(403).json({ error: 'You do not have permission for this.' });
+  const phone = String(req.query.phone || '').slice(0, 20);
+  const exclude = String(req.query.exclude || '').slice(0, 20);
+  res.json({ duplicates: await findDuplicates(await getDb(), req, phone, exclude) });
+});
+
+/**
+ * Stop a duplicate unless the person said "add anyway" (allowDuplicate: true).
+ * Returns the duplicates (empty = none) or null after it has answered 409.
+ */
+async function duplicateGate(req, res, phone, excludeId) {
+  const list = await findDuplicates(await getDb(), req, phone, excludeId);
+  if (list.length && req.body?.allowDuplicate !== true) {
+    res.status(409).json({ error: 'This mobile number is already a lead.', code: 'duplicate', duplicates: list });
+    return null;
+  }
+  return list;
+}
+
+/**
+ * Stop a deal value that looks wrong unless it was confirmed (confirmValue: true). A "surely a typo"
+ * value can only be confirmed by the owner / Management. Returns the check, or null after answering.
+ */
+async function valueGate(req, res, value, lead) {
+  const check = await checkDealValue(await getDb(), value, lead);
+  if (check.level === 'ok') return check;
+  const confirmed = req.body?.confirmValue === true;
+  if (check.level === 'block' && !mayOverrideValue(req.admin)) {
+    res.status(422).json({ error: 'This deal value looks wrong. Please check it, or ask the owner.', code: 'value_check', check, canConfirm: false });
+    return null;
+  }
+  if (!confirmed) {
+    res.status(422).json({ error: 'Please check the deal value.', code: 'value_check', check, canConfirm: true });
+    return null;
+  }
+  return check;
+}
+
+/** Keep a confirmed odd value on the lead and in the Activity log. */
+async function recordValueConfirmed(req, lead, value, check) {
+  if (check.level === 'ok') return;
+  const at = now();
+  await (await leads()).updateOne(
+    { id: lead.id },
+    { $set: { valueCheck: { value, level: check.level, reasons: check.reasons, confirmedBy: req.actor, at, ...mark(req) } } },
+  );
+  await record(req, ACTIVITY.DEAL_VALUE_CONFIRMED, lead, `₹${Math.round(value).toLocaleString('en-IN')} confirmed as correct · ${check.reasons.join(' ')}`);
+}
+
 r.get('/', async (req, res) => {
   const col = await leads();
   res.json((await col.find(scope(req)).sort({ createdAt: -1 }).toArray()).map(strip));
@@ -100,18 +155,27 @@ r.get('/assignees', requirePerm('leads.assign'), async (req, res) => {
 r.post('/', requirePerm('leads.create'), async (req, res) => {
   const p = LeadFields.safeParse(req.body);
   if (!p.success) return res.status(400).json({ error: 'Please check the lead details.' });
+  const dups = await duplicateGate(req, res, p.data.phone);
+  if (!dups) return undefined;
   const db = await getDb();
   const id = leadId(await nextSeq(db, 'lead'));
   const at = now();
   const lead = {
     id,
     ...p.data,
+    phoneKey: phoneKey(p.data.phone),
+    ...(dups.length ? { duplicateOf: dups.filter((d) => d.id).map((d) => d.id), duplicateNote: duplicateLine(dups) } : {}),
     nextFollowUp: p.data.nextFollowUp || null,
     status: 'new',
     demo: false,
     closed: null,
     attempts: [],
-    history: [{ id: uid(), at, text: `Lead created (${p.data.source || 'Other'}) by ${by(req)}`, ...mark(req) }],
+    history: [
+      ...(dups.length
+        ? [{ id: uid(), at, text: `Added although +91 ${p.data.phone} is already a lead: ${duplicateLine(dups)}`, ...mark(req) }]
+        : []),
+      { id: uid(), at, text: `Lead created (${p.data.source || 'Other'}) by ${by(req)}`, ...mark(req) },
+    ],
     createdBy: { ...req.actor, at },
     assignedTo: null,
     createdAt: at,
@@ -119,6 +183,7 @@ r.post('/', requirePerm('leads.create'), async (req, res) => {
   };
   await db.collection('leads').insertOne({ ...lead });
   await record(req, ACTIVITY.LEAD_CREATED, lead, [lead.project, lead.config, `+91 ${lead.phone}`, lead.source].filter(Boolean).join(' · '));
+  if (dups.length) await record(req, ACTIVITY.LEAD_DUPLICATE_ADDED, lead, `+91 ${lead.phone} is also ${duplicateLine(dups)}`);
   return res.status(201).json(lead);
 });
 
@@ -126,8 +191,27 @@ r.patch('/:id', requirePerm('leads.edit'), async (req, res) => {
   const p = LeadFields.partial().safeParse(req.body);
   if (!p.success) return res.status(400).json({ error: 'Please check the lead details.' });
   const before = await (await leads()).findOne({ id: req.params.id, ...scope(req) });
-  const doc = await change(req, req.params.id, p.data, `Details updated by ${by(req)}`);
+  if (!before) return res.status(404).json({ error: 'Lead not found.' });
+  const set = { ...p.data };
+  let dups = [];
+  if (p.data.phone !== undefined && phoneKey(p.data.phone) !== phoneKey(before.phone)) {
+    dups = await duplicateGate(req, res, p.data.phone, before.id);
+    if (!dups) return undefined;
+    set.phoneKey = phoneKey(p.data.phone);
+    if (dups.length) Object.assign(set, { duplicateOf: dups.filter((d) => d.id).map((d) => d.id), duplicateNote: duplicateLine(dups) });
+  }
+  let valueCheck = { level: 'ok' };
+  if (p.data.dealValue !== undefined && Number(p.data.dealValue) !== Number(before.dealValue || 0)) {
+    valueCheck = await valueGate(req, res, p.data.dealValue, { ...before, ...p.data });
+    if (!valueCheck) return undefined;
+  }
+  let doc = await change(req, req.params.id, set, `Details updated by ${by(req)}`);
   if (!doc) return res.status(404).json({ error: 'Lead not found.' });
+  if (dups.length) await record(req, ACTIVITY.LEAD_DUPLICATE_ADDED, doc, `+91 ${doc.phone} is also ${duplicateLine(dups)}`);
+  if (valueCheck.level !== 'ok') {
+    await recordValueConfirmed(req, doc, Number(p.data.dealValue), valueCheck);
+    doc = await (await leads()).findOne({ id: doc.id });
+  }
   const changes = {};
   for (const [k, v] of Object.entries(p.data)) if (short(before?.[k]) !== short(v)) changes[k] = { from: short(before?.[k]), to: short(v) };
   if (Object.keys(changes).length) await record(req, ACTIVITY.LEAD_UPDATED, doc, `Changed: ${Object.keys(changes).join(', ')}`, changes);
@@ -187,6 +271,9 @@ r.post('/:id/commit', requirePerm('deals.close'), async (req, res) => {
   const col = await leads();
   const lead = await col.findOne({ id: req.params.id, ...scope(req) });
   if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+  const finalValue = c.result === 'won' ? Number(c.value) || lead.dealValue || 0 : 0;
+  const valueCheck = c.result === 'won' ? await valueGate(req, res, finalValue, lead) : { level: 'ok' };
+  if (!valueCheck) return undefined;
   const set = {
     status: c.result,
     dealValue: c.result === 'won' ? Number(c.value) || lead.dealValue : lead.dealValue,
@@ -202,6 +289,10 @@ r.post('/:id/commit', requirePerm('deals.close'), async (req, res) => {
     lead,
     [c.result === 'won' ? `₹${Math.round(Number(c.value) || 0).toLocaleString('en-IN')}` : c.reason, c.unit, c.note].filter(Boolean).join(' · '),
   );
+  if (valueCheck.level !== 'ok') {
+    await recordValueConfirmed(req, lead, finalValue, valueCheck);
+    return res.json(strip(await col.findOne({ id: lead.id })));
+  }
   return res.json(strip(doc));
 });
 
@@ -263,6 +354,12 @@ r.post('/import', requirePerm('leads.import'), async (req, res) => {
   const last = await nextSeq(db, 'lead', drafts.length);
   const start = last - drafts.length + 1;
   const stamp = now();
+  // mobile numbers already in the CRM (or earlier in this same sheet) → marked as possible duplicates
+  const keys = [...new Set(drafts.map((d) => phoneKey(d.phone)).filter((k) => k.length === 10))];
+  const known = new Map();
+  for (const l of await db.collection('leads').find({ phoneKey: { $in: keys } }, { projection: { _id: 0, id: 1, phoneKey: 1 } }).toArray())
+    known.set(l.phoneKey, [...(known.get(l.phoneKey) || []), l.id]);
+  let dupCount = 0;
   const created = drafts.map((d, i) => {
     const longConfig = d.config.length > CONFIG_MAX;
     const notes = (longConfig ? `Configuration: ${d.config}${d.notes ? '\n' : ''}${d.notes}` : d.notes).slice(0, 10000);
@@ -274,6 +371,7 @@ r.post('/import', requirePerm('leads.import'), async (req, res) => {
       id: leadId(start + i),
       name: d.name,
       phone: d.phone,
+      phoneKey: phoneKey(d.phone),
       email: '',
       project: d.project,
       config: longConfig ? '' : d.config,
@@ -297,11 +395,21 @@ r.post('/import', requirePerm('leads.import'), async (req, res) => {
       updatedAt: stamp,
     };
   });
+  for (const l of created) {
+    const same = l.phoneKey.length === 10 ? known.get(l.phoneKey) || [] : [];
+    if (same.length) {
+      l.duplicateOf = same.slice(0, 10);
+      l.duplicateNote = `same mobile as ${same.slice(0, 5).join(', ')}`;
+      l.history.unshift({ id: uid(), at: stamp, text: `Possible duplicate: +91 ${l.phoneKey} is also ${same.slice(0, 5).join(', ')}`, ...mark(req) });
+      dupCount += 1;
+    }
+    if (l.phoneKey.length === 10) known.set(l.phoneKey, [...(known.get(l.phoneKey) || []), l.id]);
+  }
   await db.collection('leads').insertMany(created.map((x) => ({ ...x })));
   await logActivity(ACTIVITY.LEADS_IMPORTED, {
     ...person(req.admin),
     req,
-    note: `${created.length} lead(s) from Excel: ${created[0].id} – ${created[created.length - 1].id}${drafts[0].sheet ? ` (sheet "${drafts[0].sheet}")` : ''}`,
+    note: `${created.length} lead(s) from Excel: ${created[0].id} – ${created[created.length - 1].id}${drafts[0].sheet ? ` (sheet "${drafts[0].sheet}")` : ''}${dupCount ? ` · ${dupCount} possible duplicate(s) marked` : ''}`,
   });
   created.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return res.status(201).json(created);
@@ -373,15 +481,80 @@ r.post('/trash/restore', restorers, async (req, res) => {
   return res.json(back);
 });
 
-/** Remove for good. Fidelsya only (the client can always get a deleted lead back). */
+/*
+ * "Delete forever" from the recycle bin. Only the owner (not Management, not staff) and Fidelsya.
+ *  - Owner: must type DELETE. The leads disappear from the CRM for everyone, but are kept for
+ *    ARCHIVE_DAYS in "leads_archive", which only Fidelsya sees and can restore from (a mistake can
+ *    still be undone). After that MongoDB removes them by itself.
+ *  - Fidelsya: removed at once, no archive.
+ * The owner never sees (or touches) leads that Fidelsya deleted.
+ */
+export const ARCHIVE_DAYS = 120;
+const archive = async () => (await getDb()).collection('leads_archive');
+
 r.post('/trash/purge', async (req, res) => {
-  if (!isFidelsya(req)) return res.status(403).json({ error: 'Only Fidelsya can remove leads permanently.' });
+  const fid = isFidelsya(req);
+  if (!fid && req.admin.role !== 'owner') return res.status(403).json({ error: 'Only the owner can delete leads forever.' });
+  const p = Ids.safeParse({ ids: req.body?.ids }); // the body also carries confirm: 'DELETE'
+  if (!p.success) return res.status(400).json({ error: 'Choose the leads.' });
+  if (!fid && req.body?.confirm !== 'DELETE') return res.status(400).json({ error: 'Type DELETE to confirm.' });
+  const bin = await trash();
+  const found = await bin.find({ id: { $in: p.data.ids }, ...(fid ? {} : { 'deleted.support': { $ne: true } }) }).toArray();
+  if (!found.length) return res.json({ purged: 0 });
+  const ids = found.map((l) => l.id);
+  if (!fid) {
+    const at = new Date();
+    const arc = await archive();
+    await arc.deleteMany({ id: { $in: ids } }); // an older copy of the same id, if any
+    await arc.insertMany(
+      found.map(({ _id, ...l }) => ({ ...l, archived: { at: at.toISOString(), by: req.actor, expireAt: new Date(at.getTime() + ARCHIVE_DAYS * 864e5) } })),
+    );
+  }
+  const { deletedCount } = await bin.deleteMany({ id: { $in: ids } });
+  await logActivity(ACTIVITY.LEADS_PURGED, {
+    ...person(req.admin),
+    req,
+    note: `${deletedCount} lead(s) deleted forever: ${idList(found.map((l) => `${l.id} ${l.name}`))}`,
+  });
+  return res.json({ purged: deletedCount });
+});
+
+/** Fidelsya only: what the owner deleted forever, still recoverable until it expires. */
+const fidelsyaOnly = (req, res, next) => (isFidelsya(req) ? next() : res.status(403).json({ error: 'You do not have access to this.' }));
+
+r.get('/archive', fidelsyaOnly, async (_req, res) => {
+  const list = await (await archive()).find({}).sort({ 'archived.at': -1 }).limit(5000).toArray();
+  res.json(list.map(({ _id, ...l }) => ({ ...l, archived: { ...l.archived, expireAt: l.archived?.expireAt?.toISOString?.() || l.archived?.expireAt } })));
+});
+
+r.post('/archive/restore', fidelsyaOnly, async (req, res) => {
+  const p = Ids.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: 'Choose the leads to restore.' });
+  const arc = await archive();
+  const found = await arc.find({ id: { $in: p.data.ids } }).toArray();
+  if (!found.length) return res.json([]);
+  const col = await leads();
+  const clash = await col.find({ id: { $in: found.map((l) => l.id) } }, { projection: { id: 1 } }).toArray();
+  if (clash.length) return res.status(409).json({ error: `${clash.map((x) => x.id).join(', ')} already exist in the leads.` });
+  const at = now();
+  const back = found.map(({ _id, deleted, archived, ...l }) => ({
+    ...l,
+    updatedAt: at,
+    history: [{ id: uid(), at, text: `Restored by ${by(req)}`, ...mark(req) }, ...(l.history || [])],
+  }));
+  await col.insertMany(back.map((l) => ({ ...l })));
+  await arc.deleteMany({ id: { $in: back.map((l) => l.id) } });
+  await logActivity(ACTIVITY.LEADS_ARCHIVE_RESTORED, { ...person(req.admin), req, note: `${back.length} lead(s): ${idList(back.map((l) => `${l.id} ${l.name}`))}` });
+  return res.json(back);
+});
+
+r.post('/archive/purge', fidelsyaOnly, async (req, res) => {
   const p = Ids.safeParse(req.body);
   if (!p.success) return res.status(400).json({ error: 'Choose the leads.' });
-  const bin = await trash();
-  const found = await bin.find({ id: { $in: p.data.ids } }, { projection: { id: 1, name: 1 } }).toArray();
-  const { deletedCount } = await bin.deleteMany({ id: { $in: p.data.ids } });
-  await logActivity(ACTIVITY.LEADS_PURGED, { ...person(req.admin), req, note: `${deletedCount} lead(s) removed for good: ${idList(found.map((l) => `${l.id} ${l.name}`))}` });
+  const arc = await archive();
+  const found = await arc.find({ id: { $in: p.data.ids } }, { projection: { id: 1, name: 1 } }).toArray();
+  const { deletedCount } = await arc.deleteMany({ id: { $in: p.data.ids } });
+  await logActivity(ACTIVITY.LEADS_ARCHIVE_PURGED, { ...person(req.admin), req, note: `${deletedCount} lead(s) removed from the archive: ${idList(found.map((l) => `${l.id} ${l.name}`))}` });
   return res.json({ purged: deletedCount });
 });
 

@@ -6,6 +6,7 @@ import { api } from '@/services/crmApi';
 import { Btn, Card, Field, fieldCls } from '@/features/admin/components/ui';
 import { useUiStore } from '@/store/useUiStore';
 import { cn } from '@/utils/cn';
+import AppCard from '@/features/admin/components/AppCard';
 
 const strong = (p) => p.length >= 10 && /[A-Za-z]/.test(p) && /\d/.test(p);
 
@@ -166,6 +167,8 @@ export default function AccountPage() {
             </Btn>
           </form>
         </Card>
+
+        <AppCard />
       </div>
     </div>
   );

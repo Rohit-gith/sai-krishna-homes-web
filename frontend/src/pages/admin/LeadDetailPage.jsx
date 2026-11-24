@@ -261,7 +261,34 @@ export default function LeadDetailPage() {
                 Sample
               </span>
             )}
+            {lead.duplicateNote && (
+              <span
+                className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200"
+                title={`Same mobile number as ${lead.duplicateNote}`}
+              >
+                Possible duplicate
+              </span>
+            )}
+            {lead.valueCheck && (
+              <span
+                className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700 ring-1 ring-violet-200"
+                title={(lead.valueCheck.reasons || []).join(' ')}
+              >
+                Value checked: {inrShort(lead.valueCheck.value)}
+                {lead.valueCheck.confirmedBy?.name ? ` by ${lead.valueCheck.confirmedBy.name}` : ''}
+              </span>
+            )}
           </div>
+          {lead.duplicateNote && (
+            <p className="mt-2 text-xs text-amber-800">
+              Same mobile number as {lead.duplicateNote}.{' '}
+              {(lead.duplicateOf || []).map((id) => (
+                <Link key={id} to={`/admin/leads/${id}`} className="mr-2 font-semibold underline">
+                  Open {id}
+                </Link>
+              ))}
+            </p>
+          )}
           <h1 className="mt-2 break-words font-display text-3xl font-bold">{lead.name}</h1>
           <p className="mt-1 text-sm text-slate-500">
             {lead.source} · created {fmtDate(lead.createdAt)} · updated{' '}

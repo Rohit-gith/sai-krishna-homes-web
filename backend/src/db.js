@@ -35,6 +35,11 @@ async function ensureIndexes(db) {
     db.collection('leads').createIndex({ createdAt: -1 }),
     db.collection('leads_trash').createIndex({ id: 1 }),
     db.collection('leads_trash').createIndex({ 'deleted.at': -1 }),
+    // what the owner "deleted forever": kept 120 days for Fidelsya only, then MongoDB removes it by itself
+    db.collection('leads_archive').createIndex({ 'archived.expireAt': 1 }, { expireAfterSeconds: 0 }),
+    db.collection('leads_archive').createIndex({ id: 1 }),
+    db.collection('push_subscriptions').createIndex({ endpoint: 1 }, { unique: true }),
+    db.collection('push_subscriptions').createIndex({ email: 1 }),
     db.collection('enquiries').createIndex({ id: 1 }, { unique: true }),
     db.collection('enquiries').createIndex({ at: -1 }),
     // rate-limit hits expire on their own
@@ -46,6 +51,8 @@ async function ensureIndexes(db) {
     db.collection('visits').createIndex({ 'guide.email': 1, at: -1 }),
     db.collection('visits').createIndex({ phone: 1 }),
     db.collection('leads').createIndex({ phone: 1 }),
+    db.collection('leads').createIndex({ phoneKey: 1 }),
+    db.collection('leads_trash').createIndex({ phoneKey: 1 }),
     db.collection('activity').createIndex({ email: 1, at: -1 }),
     db.collection('activity').createIndex({ email: 1, deviceId: 1, type: 1 }),
   ]);
@@ -90,6 +97,22 @@ async function runOnce(db) {
       },
     );
     return { updated: r.modifiedCount };
+  });
+  // 2026-11-24: duplicate-lead warning matches on the bare 10-digit mobile number ("phoneKey"), so
+  // "+91 94370 99999" and "9437099999" are the same customer. Fill it in for the leads already there.
+  await once('leads-phone-key', async () => {
+    let n = 0;
+    for (const name of ['leads', 'leads_trash']) {
+      const col = db.collection(name);
+      const ops = [];
+      for await (const l of col.find({ phoneKey: { $exists: false } }, { projection: { _id: 1, phone: 1 } })) {
+        const d = String(l.phone || '').replace(/\D/g, '');
+        ops.push({ updateOne: { filter: { _id: l._id }, update: { $set: { phoneKey: d.length >= 10 ? d.slice(-10) : d } } } });
+        if (ops.length === 1000) n += (await col.bulkWrite(ops.splice(0))).modifiedCount;
+      }
+      if (ops.length) n += (await col.bulkWrite(ops)).modifiedCount;
+    }
+    return { updated: n };
   });
 }
 

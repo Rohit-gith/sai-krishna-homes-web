@@ -4,9 +4,10 @@
  * admin's httpOnly login cookie just works.
  */
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, data = null) {
     super(message);
     this.status = status;
+    this.data = data; // the server's full answer, e.g. { code: 'duplicate', duplicates: [...] }
   }
 }
 
@@ -19,7 +20,9 @@ let deviceIdCache = '';
 export function deviceId() {
   if (deviceIdCache) return deviceIdCache;
   const fresh = () =>
-    Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('');
+    Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) =>
+      b.toString(16).padStart(2, '0'),
+    ).join('');
   try {
     deviceIdCache = localStorage.getItem('skh_device') || '';
     if (!/^[a-f0-9]{12}$/.test(deviceIdCache)) {
@@ -46,7 +49,10 @@ export async function api(path, { method = 'GET', body, keepalive = false } = {}
       body: method === 'GET' ? undefined : JSON.stringify(body ?? {}),
     });
   } catch {
-    throw new ApiError('Could not reach the server. Check your internet connection and try again.', 0);
+    throw new ApiError(
+      'Could not reach the server. Check your internet connection and try again.',
+      0,
+    );
   }
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -55,8 +61,11 @@ export async function api(path, { method = 'GET', body, keepalive = false } = {}
       window.dispatchEvent(new CustomEvent('skh:session-expired'));
     }
     // no JSON body on a 5xx = the API itself is down/unreachable (e.g. the dev proxy can't reach it)
-    const fallback = res.status >= 500 ? 'The server is not responding. Please try again in a minute.' : `Request failed (${res.status})`;
-    throw new ApiError(data?.error || fallback, res.status);
+    const fallback =
+      res.status >= 500
+        ? 'The server is not responding. Please try again in a minute.'
+        : `Request failed (${res.status})`;
+    throw new ApiError(data?.error || fallback, res.status, data);
   }
   return data;
 }

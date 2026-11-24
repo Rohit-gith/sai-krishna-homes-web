@@ -18,6 +18,13 @@ const fail = (e) => {
   return null;
 };
 
+/**
+ * A duplicate mobile number or a deal value that looks wrong is not an error: the form shows it and
+ * asks the person ("add anyway" / "the value is correct"). Resolves to { problem } for those.
+ */
+const checked = (e) =>
+  e.data?.code === 'duplicate' || e.data?.code === 'value_check' ? { problem: e.data } : fail(e);
+
 /** Replace the given leads (matched by id) with fresh copies from the server. */
 const merge = (list, fresh) => {
   const byId = new Map(fresh.map((l) => [l.id, l]));
@@ -137,7 +144,7 @@ export const useCrmStore = create((set, get) => ({
       set((s) => ({ leads: [lead, ...s.leads] }));
       return lead.id;
     } catch (e) {
-      return fail(e);
+      return checked(e);
     }
   },
 
@@ -147,7 +154,7 @@ export const useCrmStore = create((set, get) => ({
       set((s) => ({ leads: merge(s.leads, [lead]) }));
       return lead;
     } catch (e) {
-      return fail(e);
+      return checked(e);
     }
   },
 
@@ -169,7 +176,7 @@ export const useCrmStore = create((set, get) => ({
       set((s) => ({ leads: merge(s.leads, [lead]) }));
       return lead;
     } catch (e) {
-      return fail(e);
+      return checked(e);
     }
   },
 

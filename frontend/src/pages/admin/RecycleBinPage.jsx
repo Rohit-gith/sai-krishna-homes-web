@@ -1,33 +1,92 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Archive, ArrowLeft, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { api } from '@/services/crmApi';
 import { useAuthStore } from '@/features/admin/store/useAuthStore';
 import { useCrmStore } from '@/features/admin/store/useCrmStore';
-import { Btn, Card, StatusBadge, fieldCls } from '@/features/admin/components/ui';
-import { fmtDateTime, inr } from '@/features/admin/utils';
+import { Btn, Card, Modal, StatusBadge, fieldCls } from '@/features/admin/components/ui';
+import { fmtDate, fmtDateTime, inr } from '@/features/admin/utils';
 import { useUiStore } from '@/store/useUiStore';
 import { cn } from '@/utils/cn';
 
-/** Owner / co-owner: deleted leads. Nothing is lost: restore puts a lead back with all its history. */
+/*
+ * Deleted leads. Nothing is lost: restore puts a lead back with all its history.
+ * "Delete forever": the owner only (and Fidelsya). The owner has to type DELETE. For the client the
+ * leads are gone; Fidelsya keeps them 120 days in an archive (its own tab here) to undo a mistake.
+ */
+
+const daysLeft = (iso) => Math.max(0, Math.ceil((Date.parse(iso) - Date.now()) / 864e5));
+
+/** "Delete forever" confirmation: says exactly what goes, and needs DELETE typed. */
+function DeleteForeverModal({ leads, onClose, onConfirm, busy }) {
+  const [typed, setTyped] = useState('');
+  useEffect(() => setTyped(''), [leads]);
+  if (!leads) return null;
+  const ok = typed === 'DELETE';
+  return (
+    <Modal open onClose={onClose} title={`Delete ${leads.length} lead(s) forever?`}>
+      <div className="space-y-4 text-sm">
+        <p className="rounded-xl bg-rose-50 p-3 font-medium text-rose-800">
+          {leads.length === 1 ? 'This lead' : `These ${leads.length} leads`} will be removed from
+          the CRM for everyone, with all calls and history. They cannot be restored from the recycle
+          bin.
+        </p>
+        <ul className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-3 text-slate-700">
+          {leads.map((l) => (
+            <li key={l.id}>
+              <span className="font-mono text-xs font-semibold">{l.id}</span> · {l.name} · {l.phone}
+            </li>
+          ))}
+        </ul>
+        <label className="block">
+          <span className="text-[13px] font-semibold text-navy-900">
+            Type <b className="font-mono text-rose-700">DELETE</b> to confirm
+          </span>
+          <input
+            className={cn(fieldCls, 'mt-1.5 font-mono')}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoFocus
+            autoComplete="off"
+            aria-label="Type DELETE to confirm"
+          />
+        </label>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Btn variant="outline" onClick={onClose}>
+            Cancel
+          </Btn>
+          <Btn variant="danger" disabled={!ok || busy} onClick={() => onConfirm(typed)}>
+            <Trash2 className="h-4 w-4" /> Delete {leads.length} forever
+          </Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function RecycleBinPage() {
   const me = useAuthStore((s) => s.user);
   const reloadLeads = useCrmStore((s) => s.load);
   const toast = useUiStore((s) => s.showToast);
+  const fidelsya = me?.role === 'superowner';
+  const canDeleteForever = fidelsya || me?.role === 'owner'; // not Management, not staff
+  const [tab, setTab] = useState('bin'); // 'archive' = Fidelsya only
   const [list, setList] = useState(null);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
-  const fidelsya = me?.role === 'superowner';
+  const [forever, setForever] = useState(null); // leads waiting for the DELETE confirmation
 
   const load = useCallback(() => {
     setError('');
-    api('/leads/trash').then(setList, (e) => {
+    setList(null);
+    setSelected([]);
+    api(tab === 'archive' ? '/leads/archive' : '/leads/trash').then(setList, (e) => {
       setList([]);
       setError(e.message || 'Could not load the recycle bin.');
     });
-  }, []);
+  }, [tab]);
   useEffect(() => {
     document.title = 'Recycle bin | Sai Krishna Homes';
     load();
@@ -47,13 +106,14 @@ export default function RecycleBinPage() {
   }, [list, q]);
   const toggle = (id) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const leadsOf = (ids) => (list || []).filter((l) => ids.includes(l.id));
 
   const restore = async (ids) => {
     setBusy(true);
     try {
-      const back = await api('/leads/trash/restore', { method: 'POST', body: { ids } });
+      const path = tab === 'archive' ? '/leads/archive/restore' : '/leads/trash/restore';
+      const back = await api(path, { method: 'POST', body: { ids } });
       toast(`${back.length} lead(s) restored to Leads`);
-      setSelected([]);
       load();
       reloadLeads();
     } catch (e) {
@@ -61,13 +121,26 @@ export default function RecycleBinPage() {
     }
     setBusy(false);
   };
-  const purge = async (ids) => {
-    if (!window.confirm(`Remove ${ids.length} lead(s) for good? This cannot be undone.`)) return;
+  const deleteForever = async (confirm) => {
+    const ids = forever.map((l) => l.id);
     setBusy(true);
     try {
-      const r = await api('/leads/trash/purge', { method: 'POST', body: { ids } });
-      toast(`${r.purged} lead(s) removed for good`);
-      setSelected([]);
+      const r = await api('/leads/trash/purge', { method: 'POST', body: { ids, confirm } });
+      toast(`${r.purged} lead(s) deleted forever`);
+      setForever(null);
+      load();
+    } catch (e) {
+      toast(e.message || 'Could not delete.', 'error');
+    }
+    setBusy(false);
+  };
+  const removeFromArchive = async (ids) => {
+    if (!window.confirm(`Remove ${ids.length} lead(s) from the archive now? This is final.`))
+      return;
+    setBusy(true);
+    try {
+      const r = await api('/leads/archive/purge', { method: 'POST', body: { ids } });
+      toast(`${r.purged} lead(s) removed from the archive`);
       load();
     } catch (e) {
       toast(e.message || 'Could not remove.', 'error');
@@ -75,6 +148,7 @@ export default function RecycleBinPage() {
     setBusy(false);
   };
 
+  const archive = tab === 'archive';
   return (
     <div className="mx-auto max-w-6xl">
       <Link
@@ -87,8 +161,9 @@ export default function RecycleBinPage() {
         <div>
           <h1 className="font-display text-3xl font-bold">Recycle bin</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Deleted leads stay here with their calls, history and deal. Restore one to put it back
-            exactly as it was.
+            {archive
+              ? 'Fidelsya only: leads the owner deleted forever. Kept 120 days, then removed by themselves.'
+              : 'Deleted leads stay here with their calls, history and deal. Restore one to put it back exactly as it was.'}
           </p>
         </div>
         {selected.length > 0 && (
@@ -96,14 +171,45 @@ export default function RecycleBinPage() {
             <Btn onClick={() => restore(selected)} disabled={busy}>
               <RotateCcw className="h-4 w-4" /> Restore {selected.length}
             </Btn>
-            {fidelsya && (
-              <Btn variant="danger" onClick={() => purge(selected)} disabled={busy}>
-                <Trash2 className="h-4 w-4" /> Remove for good
+            {archive ? (
+              <Btn variant="danger" onClick={() => removeFromArchive(selected)} disabled={busy}>
+                <Trash2 className="h-4 w-4" /> Remove now
               </Btn>
+            ) : (
+              canDeleteForever && (
+                <Btn variant="danger" onClick={() => setForever(leadsOf(selected))} disabled={busy}>
+                  <Trash2 className="h-4 w-4" /> Delete {selected.length} forever
+                </Btn>
+              )
             )}
           </div>
         )}
       </div>
+
+      {fidelsya && (
+        <div className="mt-5 flex gap-6 border-b border-slate-200" role="tablist">
+          {[
+            ['bin', 'Recycle bin', Trash2],
+            ['archive', 'Deleted forever (archive)', Archive],
+          ].map(([id, label, Icon]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={cn(
+                '-mb-px flex items-center gap-2 border-b-2 py-2.5 text-sm font-semibold',
+                tab === id
+                  ? 'border-navy-900 text-navy-950'
+                  : 'border-transparent text-slate-500 hover:text-navy-900',
+              )}
+            >
+              <Icon className="h-4 w-4" /> {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <label className="relative mt-5 block">
         <span className="sr-only">Search deleted leads</span>
@@ -124,7 +230,11 @@ export default function RecycleBinPage() {
         {list === null && <Card className="p-10 text-center text-slate-500">Loading…</Card>}
         {list !== null && rows.length === 0 && !error && (
           <Card className="p-10 text-center text-slate-500">
-            {list.length ? 'Nothing matches this search.' : 'The recycle bin is empty.'}
+            {list.length
+              ? 'Nothing matches this search.'
+              : archive
+                ? 'The archive is empty.'
+                : 'The recycle bin is empty.'}
           </Card>
         )}
         {rows.map((l) => (
@@ -147,21 +257,33 @@ export default function RecycleBinPage() {
                   {l.project ? ` · ${l.project}` : ''}
                   {l.closed?.result === 'won' ? ` · Won ${inr(l.closed.value || l.dealValue)}` : ''}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Deleted {fmtDateTime(l.deleted?.at)}
-                  {l.deleted?.by?.name ? ` by ${l.deleted.by.name}` : ''} ·{' '}
-                  {l.attempts?.length || 0} call(s) · {l.history?.length || 0} history line(s)
-                </p>
+                {archive ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Deleted forever {fmtDateTime(l.archived?.at)}
+                    {l.archived?.by?.name ? ` by ${l.archived.by.name}` : ''} ·{' '}
+                    <b className="text-rose-700">
+                      removed by itself on {fmtDate(l.archived?.expireAt)} (
+                      {daysLeft(l.archived?.expireAt)} days left)
+                    </b>
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Deleted {fmtDateTime(l.deleted?.at)}
+                    {l.deleted?.by?.name ? ` by ${l.deleted.by.name}` : ''} ·{' '}
+                    {l.attempts?.length || 0} call(s) · {l.history?.length || 0} history line(s)
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Btn variant="outline" onClick={() => restore([l.id])} disabled={busy}>
                   <RotateCcw className="h-4 w-4" /> Restore
                 </Btn>
-                {fidelsya && (
+                {(archive || canDeleteForever) && (
                   <button
                     type="button"
-                    aria-label={`Remove ${l.id} for good`}
-                    onClick={() => purge([l.id])}
+                    aria-label={archive ? `Remove ${l.id} now` : `Delete ${l.id} forever`}
+                    title={archive ? 'Remove from the archive now' : 'Delete forever'}
+                    onClick={() => (archive ? removeFromArchive([l.id]) : setForever([l]))}
                     disabled={busy}
                     className="rounded-xl p-2.5 text-rose-600 hover:bg-rose-50"
                   >
@@ -174,9 +296,17 @@ export default function RecycleBinPage() {
         ))}
       </div>
       <p className="mt-4 text-xs text-slate-500">
-        Deleted leads are kept safely. Every delete and restore is saved in the Activity log with
-        who did it and when.
+        Deleted leads are kept safely until someone restores them
+        {canDeleteForever ? ' or the owner deletes them forever' : ''}. Every delete, restore and
+        “delete forever” is saved in the Activity log with who did it and when.
       </p>
+
+      <DeleteForeverModal
+        leads={forever}
+        busy={busy}
+        onClose={() => setForever(null)}
+        onConfirm={deleteForever}
+      />
     </div>
   );
 }
