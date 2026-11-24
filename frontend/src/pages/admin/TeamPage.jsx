@@ -171,7 +171,7 @@ export default function TeamPage() {
     document.title = 'Team | Sai Krishna Homes';
     if (!loaded) load();
   }, [loaded, load]);
-  useLiveRefresh(load, 60 * 1000); // logins, new members and changes by others show by themselves
+  useLiveRefresh(load, ['team']); // logins, new members and changes by others show by themselves
 
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();

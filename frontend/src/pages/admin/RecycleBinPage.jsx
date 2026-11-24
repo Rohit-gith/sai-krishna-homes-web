@@ -8,6 +8,7 @@ import { Btn, Card, Modal, StatusBadge, fieldCls } from '@/features/admin/compon
 import { fmtDate, fmtDateTime, inr } from '@/features/admin/utils';
 import { useUiStore } from '@/store/useUiStore';
 import { cn } from '@/utils/cn';
+import { useLiveRefresh } from '@/features/admin/useLiveRefresh';
 
 /*
  * Deleted leads. Nothing is lost: restore puts a lead back with all its history.
@@ -78,15 +79,30 @@ export default function RecycleBinPage() {
   const [busy, setBusy] = useState(false);
   const [forever, setForever] = useState(null); // leads waiting for the DELETE confirmation
 
-  const load = useCallback(() => {
-    setError('');
-    setList(null);
-    setSelected([]);
-    api(tab === 'archive' ? '/leads/archive' : '/leads/trash').then(setList, (e) => {
-      setList([]);
-      setError(e.message || 'Could not load the recycle bin.');
-    });
-  }, [tab]);
+  // quiet = the automatic refresh: no "Loading…", ticks kept, a network hiccup changes nothing
+  const load = useCallback(
+    (quiet = false) => {
+      if (!quiet) {
+        setError('');
+        setList(null);
+        setSelected([]);
+      }
+      api(tab === 'archive' ? '/leads/archive' : '/leads/trash').then(
+        (l) => {
+          setList(l);
+          if (quiet) setSelected((s) => s.filter((id) => l.some((x) => x.id === id)));
+        },
+        (e) => {
+          if (quiet) return;
+          setList([]);
+          setError(e.message || 'Could not load the recycle bin.');
+        },
+      );
+    },
+    [tab],
+  );
+  // what others delete, restore or "delete forever" shows up by itself
+  useLiveRefresh(() => load(true), ['bin', 'leads']);
   useEffect(() => {
     document.title = 'Recycle bin | Sai Krishna Homes';
     load();

@@ -29,6 +29,7 @@ import { cn } from '@/utils/cn';
 import { useCan } from '@/features/admin/access';
 import { api } from '@/services/crmApi';
 import { OutcomeTag, SatisfactionBadge, Stars } from '@/features/admin/components/visitUi';
+import { useLiveRefresh } from '@/features/admin/useLiveRefresh';
 
 const OPEN = STATUSES.filter((s) => !['won', 'lost'].includes(s.id));
 
@@ -142,6 +143,8 @@ function LeadVisits({ lead }) {
   useEffect(() => {
     api(`/visits?leadId=${lead.id}`).then(setList, () => setList([]));
   }, [lead.id, lead.updatedAt]);
+  // a visit recorded on another phone shows here by itself
+  useLiveRefresh(() => api(`/visits?leadId=${lead.id}`).then(setList, () => {}), ['visits']);
   if (!list || !list.length) return null;
   return (
     <Card className="mt-4 p-5 sm:p-6">

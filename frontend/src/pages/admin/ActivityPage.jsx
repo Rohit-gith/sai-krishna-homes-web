@@ -13,6 +13,7 @@ import {
 import { cn } from '@/utils/cn';
 import { useAuthStore } from '@/features/admin/store/useAuthStore';
 import { istSince } from '@/features/admin/utils';
+import { useLiveRefresh } from '@/features/admin/useLiveRefresh';
 
 const PERIODS = [
   ['', 'All time'],
@@ -93,10 +94,12 @@ export default function ActivityPage() {
   }, [teamLoaded, loadTeam]);
   useEffect(() => {
     load();
-    // keep it live: new entries appear by themselves while the page is open
-    const t = setInterval(() => document.visibilityState === 'visible' && load(), 30 * 1000);
-    return () => clearInterval(t);
   }, [load]);
+  // new entries appear within seconds (quietly: a network hiccup keeps the list as it is)
+  useLiveRefresh(
+    () => fetchActivity({ email, type, from: since(period), limit }).then(setList, () => {}),
+    ['activity'],
+  );
 
   const people = useMemo(() => [...users].sort((a, b) => a.name.localeCompare(b.name)), [users]);
 

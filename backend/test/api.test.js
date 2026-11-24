@@ -1094,4 +1094,29 @@ describe('team: roles, permissions, active/inactive, passwords (Phase 1)', () =>
     const c2 = (await as(owner, `/api/leads/changes?since=${encodeURIComponent(t2)}`)).body;
     assert.ok(c2.removed.includes(l.id));
   });
+
+  test('"did anything change?": each kind of change moves only its own areas', async () => {
+    assert.equal((await as('', '/api/live')).status, 401);
+    const v0 = (await as(owner, '/api/live')).body;
+    const tick = () => new Promise((r) => setTimeout(r, 5));
+    await tick();
+    await as(owner, '/api/leads', { method: 'POST', body: { name: 'Live Ver', phone: '9555001201', allowDuplicate: true } });
+    const v1 = (await as(owner, '/api/live')).body;
+    assert.ok(v1.leads > (v0.leads || ''), 'leads moved');
+    assert.ok(v1.activity > (v0.activity || ''), 'activity moved');
+    assert.equal(v1.visits, v0.visits, 'visits did not move');
+    await tick();
+    await as(owner, '/api/visits', { method: 'POST', body: { customerName: 'Live Ver Visit', phone: '9555001202', rating: 4 } });
+    const v2 = (await as(owner, '/api/live')).body;
+    assert.ok(v2.visits > (v1.visits || ''), 'visits moved');
+    assert.equal(v2.leads, v1.leads, 'leads did not move');
+    // a refused change moves nothing; a failed login shows in the activity log at once
+    await tick();
+    await as(owner, '/api/leads', { method: 'POST', body: { name: 'x' } });
+    assert.deepEqual((await as(owner, '/api/live')).body, v2);
+    await call('/api/auth/login', { method: 'POST', body: { email: 'nobody@test.in', password: 'wrong' }, auth: false, headers: { 'X-Forwarded-For': '10.0.0.92' } });
+    const v3 = (await as(owner, '/api/live')).body;
+    assert.ok(v3.activity > v2.activity);
+    assert.equal(v3.leads, v2.leads);
+  });
 });

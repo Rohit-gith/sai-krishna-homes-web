@@ -10,6 +10,7 @@ import reportRoutes from './routes/reports.js';
 import projectRoutes, { publicProjects } from './routes/projects.js';
 import pushRoutes from './routes/push.js';
 import { sameOrigin } from './security.js';
+import { liveRoute, trackChanges } from './live.js';
 
 /** The whole API. Runs on Vercel as one serverless function (api/index.js) and locally via server/dev.js. */
 const app = express();
@@ -24,8 +25,10 @@ app.use((_req, res, next) => {
   next();
 });
 app.use('/api', sameOrigin);
+app.use('/api', trackChanges); // every change makes open CRM screens update within seconds
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/live', ...liveRoute);
 app.use('/api/auth', authRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/leads', leadRoutes);

@@ -5430,7 +5430,7 @@
     },
     {
       "name": "15. Live updates (no Refresh needed)",
-      "description": "The CRM asks GET /api/leads/changes?since=<time> every 15 s while it is on screen (and at once when the app comes back): only leads added / changed since then, plus ids to drop (deleted, or handed to someone else). since=now returns the server time to start from. Fidelsya's work stays hidden, as in GET /api/leads.",
+      "description": "The CRM asks GET /api/leads/changes?since=<time> every 15 s while it is on screen (and at once when the app comes back): only leads added / changed since then, plus ids to drop (deleted, or handed to someone else). since=now returns the server time to start from. Fidelsya's work stays hidden, as in GET /api/leads. Before that, open screens ask GET /api/live every 3 s (\"did anything change?\": the last change time per area: leads, visits, enquiries, team, projects, bin, activity) and only fetch data for the areas that changed.",
       "item": [
         {
           "name": "Login as owner",
@@ -5590,6 +5590,36 @@
                   "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"The new lead is in it\", () => pm.expect(pm.response.json().leads.some((l) => l.id === pm.collectionVariables.get(\"liveId\"))).to.be.true);",
                   "pm.collectionVariables.set(\"syncFrom\", pm.response.json().now);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Did anything change? (per area)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "live"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Has the leads area\", () => pm.expect(pm.response.json().leads).to.be.a(\"string\"));"
                 ]
               }
             }

@@ -20,6 +20,7 @@ import { PERIODS, periodRange } from '@/features/admin/visits';
 import { downloadCsv, fmtDate, fmtDateTime, inr, inrShort } from '@/features/admin/utils';
 import { cn } from '@/utils/cn';
 import MonthlyPdfButton from '@/features/admin/components/MonthlyPdfButton';
+import { useLiveRefresh } from '@/features/admin/useLiveRefresh';
 
 function Tile({ icon: Icon, label, value, sub, tone }) {
   return (
@@ -87,17 +88,21 @@ export default function ReportsPage() {
   const [error, setError] = useState('');
   const [open, setOpen] = useState(null); // whose feedback is expanded
 
-  const load = useCallback(async () => {
-    setError('');
-    const { from, to } = periodRange(period, custom);
-    if (period === 'custom' && (!from || !to)) return;
-    const qs = new URLSearchParams(Object.entries({ from, to }).filter(([, v]) => v));
-    try {
-      setData(await api(`/reports${qs.toString() ? `?${qs}` : ''}`));
-    } catch (e) {
-      setError(e.message);
-    }
-  }, [period, custom]);
+  const load = useCallback(
+    async (quiet = false) => {
+      if (!quiet) setError('');
+      const { from, to } = periodRange(period, custom);
+      if (period === 'custom' && (!from || !to)) return;
+      const qs = new URLSearchParams(Object.entries({ from, to }).filter(([, v]) => v));
+      try {
+        setData(await api(`/reports${qs.toString() ? `?${qs}` : ''}`));
+      } catch (e) {
+        if (!quiet) setError(e.message); // the automatic refresh keeps the last numbers on a hiccup
+      }
+    },
+    [period, custom],
+  );
+  useLiveRefresh(() => load(true), ['leads', 'visits', 'enquiries']); // numbers stay current while the page is open
 
   useEffect(() => {
     document.title = 'Reports | Sai Krishna Homes';

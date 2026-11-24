@@ -72,7 +72,7 @@ export default function VisitsPage() {
     },
     [period, custom, guide],
   );
-  useLiveRefresh(() => load(true)); // new visits appear by themselves
+  useLiveRefresh(() => load(true), ['visits']); // new visits appear by themselves
 
   useEffect(() => {
     document.title = 'Site visits | Sai Krishna Homes';

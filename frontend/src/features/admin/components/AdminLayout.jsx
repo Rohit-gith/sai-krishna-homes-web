@@ -29,6 +29,8 @@ import logoImg from '@/assets/logo/logo.png';
 import { cn } from '@/utils/cn';
 import { useForceDay } from '../useForceDay';
 import { setupCrmApp } from '../pwa';
+import { api } from '@/services/crmApi';
+import { LIVE_EVENT } from '../useLiveRefresh';
 
 // show: who sees the link (the pages themselves are protected too, and the server checks everything)
 const NAV = [
@@ -205,31 +207,49 @@ export default function AdminLayout() {
     }
   }, [user, checked, loaded, load]);
 
-  // the CRM stays live by itself (no "Refresh" needed): while it is on screen, every 15 s it fetches
-  // only what changed (leads) and new website enquiries (with a message). Coming back to it (another
-  // tab, or the phone app brought back) updates at once; after more than 3 minutes away it reloads
-  // everything, so a change of role or permission shows too. Nothing runs while it is hidden.
+  // The CRM is live (no "Refresh" anywhere): while it is on screen it asks every 3 s "did anything
+  // change?" (one tiny request). When an area changed, the leads are brought up to date, a new website
+  // enquiry pops a message, and the open page refreshes what it shows (useLiveRefresh). Coming back
+  // (another tab, or the phone app brought back) checks at once; after more than 3 minutes away
+  // everything reloads, so a change of role or permission shows too. Nothing runs while hidden.
   const toast = useUiStore((s) => s.showToast);
   useEffect(() => {
     if (!user || !loaded) return undefined;
     let hiddenAt = 0;
+    let last = null; // the change times seen last
+    let busy = false;
     const check = async () => {
       if (document.visibilityState !== 'visible') {
         hiddenAt = hiddenAt || Date.now();
         return;
       }
-      const away = hiddenAt ? Date.now() - hiddenAt : 0;
-      hiddenAt = 0;
-      const crm = useCrmStore.getState();
-      if (away > 3 * 60 * 1000) await crm.load();
-      else await crm.sync();
-      const fresh = await crm.pollEnquiries();
-      if (fresh.length)
-        toast(
-          `New website enquiry: ${fresh[0].name}${fresh.length > 1 ? ` and ${fresh.length - 1} more` : ''}. See Website enquiries.`,
-        );
+      if (busy) return;
+      busy = true;
+      try {
+        const away = hiddenAt ? Date.now() - hiddenAt : 0;
+        hiddenAt = 0;
+        const crm = useCrmStore.getState();
+        if (away > 3 * 60 * 1000) await crm.load();
+        const now = await api('/live').catch(() => null);
+        if (!now) return;
+        const changed = last ? Object.keys(now).filter((k) => now[k] !== last[k]) : [];
+        const first = !last;
+        last = now;
+        if (first || changed.includes('leads')) await crm.sync();
+        if (first || changed.includes('enquiries')) {
+          const fresh = await crm.pollEnquiries();
+          if (fresh.length)
+            toast(
+              `New website enquiry: ${fresh[0].name}${fresh.length > 1 ? ` and ${fresh.length - 1} more` : ''}. See Website enquiries.`,
+            );
+        }
+        if (changed.length) window.dispatchEvent(new CustomEvent(LIVE_EVENT, { detail: changed }));
+      } finally {
+        busy = false;
+      }
     };
-    const t = setInterval(check, 15 * 1000);
+    check();
+    const t = setInterval(check, 3 * 1000);
     document.addEventListener('visibilitychange', check);
     window.addEventListener('online', check);
     return () => {

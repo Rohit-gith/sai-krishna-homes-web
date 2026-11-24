@@ -5,6 +5,7 @@ import { useCrmStore } from '@/features/admin/store/useCrmStore';
 import { Btn, Card, Field, Modal, fieldCls } from '@/features/admin/components/ui';
 import { fmtDateTime } from '@/features/admin/utils';
 import { useUiStore } from '@/store/useUiStore';
+import { useLiveRefresh } from '@/features/admin/useLiveRefresh';
 
 const EMPTY = { name: '', location: '', rera: '', note: '' };
 
@@ -129,6 +130,7 @@ export default function ProjectsPage() {
     document.title = 'Projects | Sai Krishna Homes';
     reloadProjects(); // fresh lead / visit counts
   }, [reloadProjects]);
+  useLiveRefresh(reloadProjects, ['projects', 'leads', 'visits']); // projects added / shown on the website by someone else
 
   const remove = async (p) => {
     if (p.web?.published) {

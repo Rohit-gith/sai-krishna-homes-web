@@ -36,6 +36,7 @@ import { OPEN_STATUSES } from '@/features/admin/constants';
 import { fmtDate, fmtDateTime, inr, inrShort } from '@/features/admin/utils';
 import PageLoader from '@/components/common/PageLoader';
 import { cn } from '@/utils/cn';
+import { useLiveRefresh } from '@/features/admin/useLiveRefresh';
 
 const PAGE = 25;
 const inPeriod = (iso, from, to) => !!iso && (!from || iso >= from) && (!to || iso <= to);
@@ -138,6 +139,14 @@ export default function PersonPage() {
       live = false;
     };
   }, [email, from, to]);
+
+  // keep the visits and logins current while the page is open (leads and calls are live already)
+  useLiveRefresh(() => {
+    if (!email) return;
+    const qs = new URLSearchParams(Object.entries({ from, to, guide: email }).filter(([, v]) => v));
+    api(`/visits?${qs}`).then(setVisits, () => {});
+    fetchActivity({ email, from, to, limit: 500 }).then(setLog, () => {});
+  }, ['visits', 'activity']);
 
   // leads and calls are already loaded for the owner (all leads)
   const work = useMemo(() => {
