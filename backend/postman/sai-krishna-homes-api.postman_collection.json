@@ -3376,7 +3376,7 @@
     },
     {
       "name": "10. Management (CMO / GM)",
-      "description": "Management = senior people such as the CMO and GM. They get every power the owner has (20 of 20 permissions ticked), but the owner holds the keys: only the owner (or Fidelsya) can create, edit, reset or deactivate them and untick any power. Management can manage sales / site visit executives only, never the owner or each other, and cannot hand out a power they do not have. Run top to bottom: it logs in as the owner, then the CMO, then the owner again.",
+      "description": "Management = senior people such as the CMO and GM. They get every power the owner has (all 21 permissions ticked by default), but the owner holds the keys: only the owner (or Fidelsya) can create, edit, reset or deactivate them and untick any power. Management can manage sales / site visit executives only, never the owner or each other, and cannot hand out a power they do not have. Run top to bottom: it logs in as the owner, then the CMO, then the owner again.",
       "item": [
         {
           "name": "Login as owner",
@@ -3463,7 +3463,7 @@
                   "const u = pm.response.json();",
                   "pm.collectionVariables.set(\"cmoEmail\", u.email); pm.collectionVariables.set(\"cmoId\", u.id);",
                   "pm.test(\"Designation saved\", () => pm.expect(u.designation).to.eql(\"CMO\"));",
-                  "pm.test(\"Every power ticked (20)\", () => pm.expect(u.permissions.length).to.eql(20));"
+                  "pm.test(\"Every power ticked (21)\", () => pm.expect(u.permissions.length).to.eql(21));"
                 ]
               }
             }
@@ -3927,7 +3927,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"permissions\": [\n    \"leads.view_all\",\n    \"leads.create\",\n    \"leads.edit\",\n    \"leads.delete\",\n    \"leads.assign\",\n    \"leads.import\",\n    \"leads.export\",\n    \"deals.close\",\n    \"attempts.log\",\n    \"enquiries.view\",\n    \"visits.log\",\n    \"visits.view_all\",\n    \"reports.view\",\n    \"team.manage\",\n    \"projects.manage\",\n    \"leads.restore\",\n    \"leads.handover\",\n    \"enquiries.delete\",\n    \"visits.manage\"\n  ],\n  \"note\": \"Postman test\"\n}",
+              "raw": "{\n  \"permissions\": [\n    \"leads.view_all\",\n    \"leads.create\",\n    \"leads.edit\",\n    \"leads.delete\",\n    \"leads.assign\",\n    \"leads.import\",\n    \"leads.export\",\n    \"deals.close\",\n    \"attempts.log\",\n    \"enquiries.view\",\n    \"visits.log\",\n    \"visits.view_all\",\n    \"reports.view\",\n    \"team.manage\",\n    \"projects.manage\",\n    \"leads.restore\",\n    \"leads.handover\",\n    \"enquiries.delete\",\n    \"visits.manage\",\n    \"reports.download\"\n  ],\n  \"note\": \"Postman test\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4096,7 +4096,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"permissions\": [\n    \"leads.view_all\",\n    \"leads.create\",\n    \"leads.edit\",\n    \"leads.delete\",\n    \"leads.assign\",\n    \"leads.import\",\n    \"leads.export\",\n    \"deals.close\",\n    \"attempts.log\",\n    \"enquiries.view\",\n    \"visits.log\",\n    \"visits.view_all\",\n    \"reports.view\",\n    \"team.manage\",\n    \"activity.view\",\n    \"projects.manage\",\n    \"leads.restore\",\n    \"leads.handover\",\n    \"enquiries.delete\",\n    \"visits.manage\"\n  ]\n}",
+              "raw": "{\n  \"permissions\": [\n    \"leads.view_all\",\n    \"leads.create\",\n    \"leads.edit\",\n    \"leads.delete\",\n    \"leads.assign\",\n    \"leads.import\",\n    \"leads.export\",\n    \"deals.close\",\n    \"attempts.log\",\n    \"enquiries.view\",\n    \"visits.log\",\n    \"visits.view_all\",\n    \"reports.view\",\n    \"team.manage\",\n    \"activity.view\",\n    \"projects.manage\",\n    \"leads.restore\",\n    \"leads.handover\",\n    \"enquiries.delete\",\n    \"visits.manage\",\n    \"reports.download\"\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4112,7 +4112,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"20 of 20 again\", () => pm.expect(pm.response.json().permissions.length).to.eql(20));"
+                  "pm.test(\"21 of 21 again\", () => pm.expect(pm.response.json().permissions.length).to.eql(21));"
                 ]
               }
             }
@@ -5208,6 +5208,211 @@
                 "exec": [
                   "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"Recorded\", () => pm.expect(pm.response.json().length).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "14. Monthly PDF report",
+      "description": "The PDF is made in the browser (Reports → Monthly PDF) from GET /api/reports for that month (now also by project, by source and website enquiries). POST /api/reports/downloaded records who downloaded which month in the Activity log. Who can: Owner and Fidelsya always (nobody can take it away from them). Management (CMO / GM) get it ticked by default and the owner can untick \"Download the monthly PDF report\". Sales / site visit: no.",
+      "item": [
+        {
+          "name": "Login as owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test.owner@skh.test\",\n  \"password\": \"TestOwner123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report for this month (by project / source)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Has projects, sources and enquiries\", () => { pm.expect(r.projects).to.be.an(\"array\"); pm.expect(r.sources).to.be.an(\"array\"); pm.expect(r.totals.enquiries).to.be.a(\"number\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a download (bad month → 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/downloaded",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "downloaded"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"month\": \"November\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a download",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/downloaded",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "downloaded"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"month\": \"2026-11\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activity log: report downloaded",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/activity?type=report_downloaded",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "activity"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "report_downloaded"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Recorded\", () => pm.expect(pm.response.json()[0].note).to.include(\"2026-11\"));"
                 ]
               }
             }

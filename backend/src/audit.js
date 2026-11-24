@@ -31,6 +31,7 @@ export const ACTIVITY = {
   LEADS_ARCHIVE_PURGED: 'leads_archive_purged', // Fidelsya removed it from the archive for good
   PUSH_ENABLED: 'push_enabled', // phone / desktop notifications turned on for a device
   PUSH_DISABLED: 'push_disabled',
+  REPORT_DOWNLOADED: 'report_downloaded', // the monthly PDF report
   LEADS_HANDED_OVER: 'leads_handed_over', // all open leads of one person given to another
   ENQUIRY_RECEIVED: 'enquiry_received', // a visitor filled a form on the website
   ENQUIRY_DELETED: 'enquiry_deleted',

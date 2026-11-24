@@ -38,6 +38,7 @@ export const PERMISSIONS = [
   { id: 'leads.handover', label: "Hand over one person's open leads to another", group: 'management' },
   { id: 'enquiries.delete', label: 'Delete website enquiries', group: 'management' },
   { id: 'visits.manage', label: "Edit and delete anyone's site visits", group: 'management' },
+  { id: 'reports.download', label: 'Download the monthly PDF report', group: 'management' },
 ];
 export const PERMISSION_IDS = PERMISSIONS.map((p) => p.id);
 /** Owner-level powers: never given to sales / site visit executives. */

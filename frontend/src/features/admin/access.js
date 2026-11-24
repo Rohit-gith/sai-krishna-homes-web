@@ -34,6 +34,7 @@ export const PERMISSION_LABEL = {
   'leads.handover': "Hand over one person's open leads to another",
   'enquiries.delete': 'Delete website enquiries',
   'visits.manage': "Edit and delete anyone's site visits",
+  'reports.download': 'Download the monthly PDF report',
 };
 
 /** Owner or Fidelsya: every power, always. Management (CMO, GM) get theirs as permissions the owner can untick. */

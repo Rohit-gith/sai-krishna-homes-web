@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { ACTIVITY, logActivity } from '../audit.js';
 import { getDb } from '../db.js';
 import { can } from '../permissions.js';
 import { requireAdmin } from '../security.js';
@@ -34,10 +35,11 @@ r.get('/', async (req, res) => {
   if (from > to) return res.status(400).json({ error: '"From" must be before "To".' });
 
   const db = await getDb();
-  const [admins, leads, visits] = await Promise.all([
+  const [admins, leads, visits, enquiries] = await Promise.all([
     db.collection('admins').find({}, { projection: { email: 1, name: 1, role: 1, active: 1 } }).toArray(),
-    db.collection('leads').find({}, { projection: { _id: 0, id: 1, status: 1, closed: 1, dealValue: 1, createdAt: 1, createdBy: 1, assignedTo: 1, attempts: 1, source: 1 } }).toArray(),
+    db.collection('leads').find({}, { projection: { _id: 0, id: 1, status: 1, closed: 1, dealValue: 1, createdAt: 1, createdBy: 1, assignedTo: 1, attempts: 1, source: 1, project: 1 } }).toArray(),
     db.collection('visits').find({ at: { $gte: from, $lte: to } }, { projection: { _id: 0 } }).sort({ at: -1 }).toArray(),
+    db.collection('enquiries').countDocuments({ at: { $gte: from, $lte: to }, spam: { $ne: true } }),
   ]);
   // Fidelsya never shows up in the client's reports
   const hidden = new Set(['script', 'support', ...admins.filter((a) => a.role === 'superowner').map((a) => a.email)]);
@@ -72,8 +74,30 @@ r.get('/', async (req, res) => {
   let unassignedNew = 0;
   // every lead that came in during the period, by where it stands now (for the pie chart)
   const status = { open: 0, won: 0, lost: 0 };
+  // by project and by where the lead came from: new leads in the period, deals won in the period
+  const byProject = new Map();
+  const bySource = new Map();
+  const bucket = (m, key) => {
+    if (!m.has(key)) m.set(key, { name: key, newLeads: 0, won: 0, wonValue: 0, lost: 0 });
+    return m.get(key);
+  };
   for (const l of leads) {
     const p = credit(l);
+    const proj = l.project || 'Not decided';
+    const src = l.source || 'Other';
+    if (inRange(l.createdAt, from, to)) {
+      bucket(byProject, proj).newLeads += 1;
+      bucket(bySource, src).newLeads += 1;
+    }
+    if (l.closed && inRange(l.closed.at, from, to)) {
+      const value = l.closed.result === 'won' ? Number(l.closed.value || l.dealValue) || 0 : 0;
+      for (const b of [bucket(byProject, proj), bucket(bySource, src)]) {
+        if (l.closed.result === 'won') {
+          b.won += 1;
+          b.wonValue += value;
+        } else b.lost += 1;
+      }
+    }
     if (inRange(l.createdAt, from, to)) {
       status[l.status === 'won' ? 'won' : l.status === 'lost' ? 'lost' : 'open'] += 1;
       if (p) {
@@ -143,11 +167,14 @@ r.get('/', async (req, res) => {
 
   const sum = (list, k) => list.reduce((s, x) => s + (x[k] || 0), 0);
   const totalVisits = sum(visitRows, 'visits');
+  const ranked = (m) => [...m.values()].sort((a, b) => b.wonValue - a.wonValue || b.won - a.won || b.newLeads - a.newLeads);
   res.json({
     from,
     to,
     sales,
     visits: visitRows,
+    projects: ranked(byProject),
+    sources: ranked(bySource),
     totals: {
       status,
       newLeads: sum(sales, 'newLeads') + unassignedNew,
@@ -161,8 +188,18 @@ r.get('/', async (req, res) => {
       satisfied: sum(visitRows, 'satisfied'),
       notSatisfied: sum(visitRows, 'notSatisfied'),
       avgRating: totalVisits ? round1(visitRows.reduce((s, x) => s + (x.avgRating || 0) * x.visits, 0) / totalVisits) : null,
+      enquiries,
     },
   });
+});
+
+/** The monthly PDF is made in the browser from the numbers above; this records who downloaded which month. */
+r.post('/downloaded', async (req, res) => {
+  if (!can(req.admin, 'reports.download')) return res.status(403).json({ error: 'Only the owner can download the monthly report.' });
+  const p = z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) }).safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: 'Invalid month.' });
+  await logActivity(ACTIVITY.REPORT_DOWNLOADED, { email: req.admin.email, name: req.admin.name, req, note: `Monthly report ${p.data.month} (PDF)` });
+  return res.json({ ok: true });
 });
 
 export default r;

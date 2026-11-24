@@ -19,6 +19,7 @@ import { CHART, Donut } from '@/features/admin/components/charts';
 import { PERIODS, periodRange } from '@/features/admin/visits';
 import { downloadCsv, fmtDate, fmtDateTime, inr, inrShort } from '@/features/admin/utils';
 import { cn } from '@/utils/cn';
+import MonthlyPdfButton from '@/features/admin/components/MonthlyPdfButton';
 
 function Tile({ icon: Icon, label, value, sub, tone }) {
   return (
@@ -206,6 +207,7 @@ export default function ReportsPage() {
           </Btn>
         </div>
       </div>
+      <MonthlyPdfButton />
       {period === 'custom' && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm sm:justify-end">
           <span className="text-slate-500">From</span>

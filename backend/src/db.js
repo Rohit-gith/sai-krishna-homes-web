@@ -98,6 +98,15 @@ async function runOnce(db) {
     );
     return { updated: r.modifiedCount };
   });
+  // 2026-11-24: new owner-level power "Download the monthly PDF report". Management accounts get
+  // every owner power by default, so the ones that already exist get this one too (owner can untick).
+  await once('management-reports-download', async () => {
+    const r = await db.collection('admins').updateMany(
+      { role: 'management', permissions: { $ne: 'reports.download' } },
+      { $addToSet: { permissions: 'reports.download' } },
+    );
+    return { updated: r.modifiedCount };
+  });
   // 2026-11-24: duplicate-lead warning matches on the bare 10-digit mobile number ("phoneKey"), so
   // "+91 94370 99999" and "9437099999" are the same customer. Fill it in for the leads already there.
   await once('leads-phone-key', async () => {

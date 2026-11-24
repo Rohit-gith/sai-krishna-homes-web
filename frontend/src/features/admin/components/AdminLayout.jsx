@@ -98,7 +98,8 @@ function SideNav({ onNavigate }) {
   const loading = useCrmStore((s) => s.loading);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-navy-950 px-4 py-5 text-white">
+    // overscroll-contain: reaching the end of the menu never scrolls the page behind it
+    <div className="flex h-full touch-pan-y flex-col overflow-y-auto overscroll-contain bg-navy-950 px-4 py-5 text-white [-webkit-overflow-scrolling:touch]">
       <div className="px-2">
         <Brand />
       </div>
@@ -229,6 +230,35 @@ export default function AdminLayout() {
     document.title = 'Admin | Sai Krishna Homes';
   }, []);
 
+  // phone menu open: freeze the page behind it (also on iPhone, where overflow:hidden alone is not
+  // enough), close it with Esc / the back gesture's Escape, and put the page back where it was
+  useEffect(() => {
+    if (!open) return undefined;
+    const y = window.scrollY;
+    const b = document.body.style;
+    const keep = {
+      position: b.position,
+      top: b.top,
+      left: b.left,
+      right: b.right,
+      overflow: b.overflow,
+    };
+    Object.assign(b, {
+      position: 'fixed',
+      top: `-${y}px`,
+      left: '0',
+      right: '0',
+      overflow: 'hidden',
+    });
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      Object.assign(b, keep);
+      window.scrollTo(0, y);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   if (!checked) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
 
@@ -254,25 +284,34 @@ export default function AdminLayout() {
       <AnimatePresence>
         {open && (
           <motion.div
-            className="fixed inset-0 z-50 lg:hidden"
+            className="fixed inset-0 z-50 overscroll-none lg:hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
           >
-            <div className="absolute inset-0 bg-navy-950/60" onClick={() => setOpen(false)} />
+            {/* the dark backdrop can't be dragged: a swipe on it does nothing but a tap closes */}
+            <div
+              className="absolute inset-0 touch-none bg-navy-950/60"
+              onClick={() => setOpen(false)}
+            />
             <motion.div
-              className="absolute inset-y-0 left-0 w-72"
+              // dvh: the full visible height, steady while the phone's address bar shows / hides
+              className="absolute left-0 top-0 h-[100dvh] w-72 max-w-[85vw] shadow-2xl will-change-transform"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'tween', duration: 0.25 }}
+              transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }}
             >
               <SideNav onNavigate={() => setOpen(false)} />
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
-                className="absolute right-3 top-5 p-2 text-white/70"
+                className="absolute right-3 top-4 z-10 rounded-full bg-navy-950/95 p-2 text-white/80 shadow-lg ring-1 ring-white/10 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>

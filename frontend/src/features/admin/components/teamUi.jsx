@@ -480,7 +480,7 @@ export function UserFormModal({ open, onClose, user }) {
           />
         ) : (
           <div className="rounded-xl bg-primary-50 p-3 text-sm text-primary-900">
-            <p className="font-semibold">Full access, the same as you.</p>
+            <p className="font-semibold">Full owner access: everything in the CRM, always.</p>
             <p className="mt-1">
               For a partner or family member who runs things when you are away: add and manage the
               team, see all leads, visits and reports. Everything they do is recorded in the
@@ -802,6 +802,9 @@ export const ACTIVITY_LABEL = {
   leads_purged: 'Leads deleted forever',
   leads_archive_restored: 'Restored from the archive (Fidelsya)',
   leads_archive_purged: 'Removed from the archive (Fidelsya)',
+  push_enabled: 'Notifications turned on',
+  push_disabled: 'Notifications turned off',
+  report_downloaded: 'Monthly report downloaded (PDF)',
   leads_handed_over: 'Leads handed over',
   enquiry_received: 'Website enquiry received',
   enquiry_deleted: 'Website enquiry deleted',

@@ -1035,4 +1035,28 @@ describe('team: roles, permissions, active/inactive, passwords (Phase 1)', () =>
     // a website enquiry still works when notifications are not set up on the server (tests have no keys)
     assert.equal((await call('/api/enquiries', { method: 'POST', body: enquiry({ name: 'Push Visitor', phone: '9876500999' }), auth: false, headers: { 'X-Forwarded-For': '10.0.0.91' } })).status, 201);
   });
+
+  test('monthly report: by project and source, enquiries counted; PDF download is owner-level and logged', async () => {
+    const mk = async (body) => (await as(owner, '/api/leads', { method: 'POST', body: { allowDuplicate: true, ...body } })).body;
+    const a = await mk({ name: 'Rep A', phone: '9555001001', project: 'Report Test Residency', source: 'Facebook' });
+    await mk({ name: 'Rep B', phone: '9555001002', project: 'Report Test Residency', source: 'Website' });
+    await as(owner, `/api/leads/${a.id}/commit`, { method: 'POST', body: { result: 'won', value: 6500000, unit: 'A-1', note: '' } });
+    const from = new Date(Date.now() - 3600e3).toISOString();
+    const rep = (await as(owner, `/api/reports?from=${encodeURIComponent(from)}`)).body;
+    const pw = rep.projects.find((x) => x.name === 'Report Test Residency');
+    assert.equal(pw.newLeads, 2);
+    assert.equal(pw.won, 1);
+    assert.equal(pw.wonValue, 6500000);
+    assert.equal(rep.sources.find((x) => x.name === 'Facebook').won, 1);
+    assert.equal(typeof rep.totals.enquiries, 'number');
+    // the PDF download: owner yes (logged), sales no
+    const vee = (await login('vee@test.in', 'VeeSales1234')).ck;
+    assert.equal((await as(vee, '/api/reports/downloaded', { method: 'POST', body: { month: '2026-11' } })).status, 403);
+    assert.equal((await as(owner, '/api/reports/downloaded', { method: 'POST', body: { month: 'Nov' } })).status, 400);
+    assert.equal((await as(owner, '/api/reports/downloaded', { method: 'POST', body: { month: '2026-11' } })).status, 200);
+    const log = (await as(owner, '/api/activity?type=report_downloaded')).body;
+    assert.match(log[0].note, /Monthly report 2026-11/);
+    // Management has it by default (it is an owner-level power)
+    assert.ok((await as(owner, '/api/users/meta')).body.roles.find((r) => r.id === 'management').defaultPermissions.includes('reports.download'));
+  });
 });
