@@ -34,6 +34,7 @@ import {
 import { ROLE_LABEL, can } from '@/features/admin/access';
 import PageLoader from '@/components/common/PageLoader';
 import { cn } from '@/utils/cn';
+import { useLiveRefresh } from '@/features/admin/useLiveRefresh';
 
 /** Can the signed-in person change this account? (mirrors the server rules) */
 function manageable(me, u) {
@@ -170,6 +171,7 @@ export default function TeamPage() {
     document.title = 'Team | Sai Krishna Homes';
     if (!loaded) load();
   }, [loaded, load]);
+  useLiveRefresh(load, 60 * 1000); // logins, new members and changes by others show by themselves
 
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();

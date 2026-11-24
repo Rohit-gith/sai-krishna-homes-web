@@ -141,6 +141,30 @@ r.get('/', async (req, res) => {
   res.json((await col.find(scope(req)).sort({ createdAt: -1 }).toArray()).map(strip));
 });
 
+/**
+ * What changed since the CRM last asked (it asks every few seconds while open), so every screen
+ * stays up to date without "Refresh": leads added / changed since then, and the ids to drop
+ * (deleted, or no longer this person's lead after being handed to someone else).
+ * `now` is the server's clock, to use as the next `since` (phone clocks can be wrong).
+ */
+r.get('/changes', async (req, res) => {
+  const since = String(req.query.since || '');
+  const now = new Date().toISOString();
+  if (since === 'now') return res.json({ now, leads: [], removed: [] }); // where to start counting from
+  if (Number.isNaN(Date.parse(since))) return res.status(400).json({ error: 'Invalid time.' });
+  const col = await leads();
+  const mine = scope(req);
+  const [changed, gone, movedAway] = await Promise.all([
+    col.find({ updatedAt: { $gt: since }, ...mine }).sort({ createdAt: -1 }).limit(2000).toArray(),
+    (await trash()).find({ 'deleted.at': { $gt: since } }, { projection: { id: 1 } }).toArray(),
+    Object.keys(mine).length
+      ? col.find({ updatedAt: { $gt: since }, $nor: [mine] }, { projection: { id: 1 } }).toArray()
+      : Promise.resolve([]),
+  ]);
+  const clean = (l) => (isFidelsya(req) ? strip(l) : cleanLead(strip(l)));
+  return res.json({ now, leads: changed.map(clean), removed: [...gone, ...movedAway].map((x) => x.id) });
+});
+
 /** People leads can be assigned to (for the assign dropdown). */
 r.get('/assignees', requirePerm('leads.assign'), async (req, res) => {
   const db = await getDb();

@@ -39,7 +39,10 @@ export const useCrmStore = create((set, get) => ({
   loading: false,
   loadError: '',
 
-  /** Fetch everything (on opening the admin panel, and on "Refresh"). */
+  syncedAt: '', // the server's time of the last fetch; the next sync asks for changes after it
+  lastFullLoad: 0,
+
+  /** Fetch everything (on opening the admin panel, on "Refresh", and after the app was away a while). */
   load: async () => {
     if (get().loading) return;
     set({ loading: true, loadError: '' });
@@ -47,6 +50,9 @@ export const useCrmStore = create((set, get) => ({
       // fresh role + permissions first, so a change the owner just made shows at once
       const user = await api('/auth/me');
       useAuthStore.setState({ user });
+      // remember the server's "now" before reading, so nothing changed meanwhile is missed
+      const { now } = await api('/leads/changes?since=now');
+      set({ syncedAt: now, lastFullLoad: Date.now() });
       // staff without "See website enquiries" don't ask for them (the server would say no)
       const [leads, enquiries, projects] = await Promise.all([
         api('/leads'),
@@ -76,8 +82,42 @@ export const useCrmStore = create((set, get) => ({
     return fresh;
   },
 
+  /**
+   * Bring the leads up to date with only what changed since the last time (every few seconds while
+   * the CRM is on screen): someone else's new lead, a call logged, a deal won, a lead handed over or
+   * deleted all appear without pressing Refresh. Cheap: an unchanged CRM sends back almost nothing.
+   */
+  sync: async () => {
+    const { loaded, loading, syncing, syncedAt } = get();
+    if (!loaded || loading || syncing || !syncedAt) return;
+    set({ syncing: true });
+    try {
+      const r = await api(`/leads/changes?since=${encodeURIComponent(syncedAt)}`);
+      if (r.leads.length || r.removed.length) {
+        set((s) => {
+          const fresh = new Map(r.leads.map((l) => [l.id, l]));
+          const gone = new Set(r.removed.filter((id) => !fresh.has(id)));
+          const kept = s.leads.filter((l) => !gone.has(l.id)).map((l) => fresh.get(l.id) || l);
+          const known = new Set(kept.map((l) => l.id));
+          const added = r.leads.filter((l) => !known.has(l.id));
+          const leads = added.length
+            ? [...added, ...kept].sort((a, b) =>
+                String(b.createdAt).localeCompare(String(a.createdAt)),
+              )
+            : kept;
+          return { leads };
+        });
+      }
+      set({ syncedAt: r.now });
+    } catch {
+      // offline for a moment: try again next time (a logged-out session is handled by the API helper)
+    }
+    set({ syncing: false });
+  },
+
   /** Clear on logout so the next person on this device never sees the previous data. */
-  reset: () => set({ leads: [], enquiries: [], projects: [], loaded: false, loadError: '' }),
+  reset: () =>
+    set({ leads: [], enquiries: [], projects: [], loaded: false, loadError: '', syncedAt: '' }),
 
   /* ---------- projects (owner / co-owner) ---------- */
   reloadProjects: async () => {

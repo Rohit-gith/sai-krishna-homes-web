@@ -1059,4 +1059,39 @@ describe('team: roles, permissions, active/inactive, passwords (Phase 1)', () =>
     // Management has it by default (it is an owner-level power)
     assert.ok((await as(owner, '/api/users/meta')).body.roles.find((r) => r.id === 'management').defaultPermissions.includes('reports.download'));
   });
+
+  test('live updates: only what changed since last time, deletes and hand-overs included; Fidelsya stays hidden', async () => {
+    const vee = (await login('vee@test.in', 'VeeSales1234')).ck;
+    const start = (await as(owner, '/api/leads/changes?since=now')).body.now;
+    const vStart = (await as(vee, '/api/leads/changes?since=now')).body.now;
+    assert.equal((await as(owner, '/api/leads/changes?since=yesterday')).status, 400);
+    // nothing new yet
+    const none = (await as(owner, `/api/leads/changes?since=${encodeURIComponent(start)}`)).body;
+    assert.equal(none.leads.length, 0);
+    // the sales exec adds a lead, then Fidelsya logs a call on it: the owner sees both, without Fidelsya
+    const l = (await as(vee, '/api/leads', { method: 'POST', body: { name: 'Live Lead', phone: '9555001101', allowDuplicate: true } })).body;
+    await as(fid, `/api/leads/${l.id}/attempts`, { method: 'POST', body: { type: 'Call', outcome: 'connected', note: 'fid call' } });
+    const c1 = (await as(owner, `/api/leads/changes?since=${encodeURIComponent(start)}`)).body;
+    const seen = c1.leads.find((x) => x.id === l.id);
+    assert.ok(seen, 'new lead arrives');
+    assert.equal(seen.attempts.length, 0, "Fidelsya's call is hidden");
+    assert.ok(!JSON.stringify(seen.history).includes('Support'));
+    // the owner's lead given to the sales exec arrives in their list; handed on to someone else, it leaves
+    const o = (await as(owner, '/api/leads', { method: 'POST', body: { name: 'Owner Live', phone: '9555001102', allowDuplicate: true } })).body;
+    await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [o.id], to: 'vee@test.in' } });
+    const v0 = (await as(vee, `/api/leads/changes?since=${encodeURIComponent(vStart)}`)).body;
+    assert.ok(v0.leads.some((x) => x.id === o.id));
+    await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [o.id], to: 'sam@test.in' } });
+    const v1 = (await as(vee, `/api/leads/changes?since=${encodeURIComponent(v0.now)}`)).body;
+    assert.ok(v1.removed.includes(o.id));
+    assert.ok(!v1.leads.some((x) => x.id === o.id));
+    // a lead they created themselves stays theirs (as before)
+    await as(owner, '/api/leads/assign', { method: 'POST', body: { ids: [l.id], to: 'sam@test.in' } });
+    assert.ok(!(await as(vee, `/api/leads/changes?since=${encodeURIComponent(v1.now)}`)).body.removed.includes(l.id));
+    // deleted → removed for the owner too
+    const t2 = c1.now;
+    await as(owner, '/api/leads/delete', { method: 'POST', body: { ids: [l.id] } });
+    const c2 = (await as(owner, `/api/leads/changes?since=${encodeURIComponent(t2)}`)).body;
+    assert.ok(c2.removed.includes(l.id));
+  });
 });

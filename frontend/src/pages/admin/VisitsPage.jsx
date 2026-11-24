@@ -34,6 +34,7 @@ import {
 import { fmtDateTime } from '@/features/admin/utils';
 import { useUiStore } from '@/store/useUiStore';
 import { cn } from '@/utils/cn';
+import { useLiveRefresh } from '@/features/admin/useLiveRefresh';
 
 const PAGE = 30;
 
@@ -55,17 +56,23 @@ export default function VisitsPage() {
   const [editing, setEditing] = useState(null); // visit, or 'new'
   const [historyOf, setHistoryOf] = useState(null);
 
-  const load = useCallback(async () => {
-    setError('');
-    const { from, to } = periodRange(period, custom);
-    const qs = new URLSearchParams(Object.entries({ from, to, guide }).filter(([, v]) => v));
-    try {
-      setList(await api(`/visits${qs.toString() ? `?${qs}` : ''}`));
-    } catch (e) {
-      setError(e.message);
-      setList([]);
-    }
-  }, [period, custom, guide]);
+  // quiet = the automatic refresh: a short network hiccup never empties the list
+  const load = useCallback(
+    async (quiet = false) => {
+      if (!quiet) setError('');
+      const { from, to } = periodRange(period, custom);
+      const qs = new URLSearchParams(Object.entries({ from, to, guide }).filter(([, v]) => v));
+      try {
+        setList(await api(`/visits${qs.toString() ? `?${qs}` : ''}`));
+      } catch (e) {
+        if (quiet) return;
+        setError(e.message);
+        setList([]);
+      }
+    },
+    [period, custom, guide],
+  );
+  useLiveRefresh(() => load(true)); // new visits appear by themselves
 
   useEffect(() => {
     document.title = 'Site visits | Sai Krishna Homes';

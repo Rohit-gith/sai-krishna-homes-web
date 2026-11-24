@@ -205,23 +205,37 @@ export default function AdminLayout() {
     }
   }, [user, checked, loaded, load]);
 
-  // new website enquiries arrive on their own, with a message
+  // the CRM stays live by itself (no "Refresh" needed): while it is on screen, every 15 s it fetches
+  // only what changed (leads) and new website enquiries (with a message). Coming back to it (another
+  // tab, or the phone app brought back) updates at once; after more than 3 minutes away it reloads
+  // everything, so a change of role or permission shows too. Nothing runs while it is hidden.
   const toast = useUiStore((s) => s.showToast);
   useEffect(() => {
     if (!user || !loaded) return undefined;
+    let hiddenAt = 0;
     const check = async () => {
-      if (document.visibilityState !== 'visible') return;
-      const fresh = await useCrmStore.getState().pollEnquiries();
+      if (document.visibilityState !== 'visible') {
+        hiddenAt = hiddenAt || Date.now();
+        return;
+      }
+      const away = hiddenAt ? Date.now() - hiddenAt : 0;
+      hiddenAt = 0;
+      const crm = useCrmStore.getState();
+      if (away > 3 * 60 * 1000) await crm.load();
+      else await crm.sync();
+      const fresh = await crm.pollEnquiries();
       if (fresh.length)
         toast(
           `New website enquiry: ${fresh[0].name}${fresh.length > 1 ? ` and ${fresh.length - 1} more` : ''}. See Website enquiries.`,
         );
     };
-    const t = setInterval(check, 30 * 1000);
+    const t = setInterval(check, 15 * 1000);
     document.addEventListener('visibilitychange', check);
+    window.addEventListener('online', check);
     return () => {
       clearInterval(t);
       document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('online', check);
     };
   }, [user, loaded, toast]);
 
